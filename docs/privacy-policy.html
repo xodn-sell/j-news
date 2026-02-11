@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J-news 개인정보처리방침</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+      line-height: 1.8;
+      color: #333;
+      background: #fafafa;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 2px solid #eee;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 900;
+      color: #1a2744;
+      margin-bottom: 8px;
+    }
+    .header .app-name {
+      font-size: 14px;
+      color: #666;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .header .date {
+      font-size: 13px;
+      color: #999;
+      margin-top: 12px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1a2744;
+      margin: 36px 0 16px;
+      padding-left: 12px;
+      border-left: 4px solid #2B3467;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #444;
+      margin: 20px 0 8px;
+    }
+    p, li {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    ul {
+      padding-left: 20px;
+      margin-bottom: 16px;
+    }
+    li { margin-bottom: 6px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: 700;
+      color: #333;
+    }
+    .highlight {
+      background: #f0f4ff;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 20px 0;
+      border: 1px solid #dde4f0;
+    }
+    .highlight p {
+      margin-bottom: 0;
+      color: #2B3467;
+      font-weight: 600;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+      font-size: 13px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="app-name">J-news</div>
+      <h1>개인정보처리방침</h1>
+      <div class="date">시행일: 2026년 2월 11일 | 최종 수정일: 2026년 2월 11일</div>
+    </div>
+
+    <div class="highlight">
+      <p>J-news는 사용자의 개인정보를 수집하지 않으며, 모든 데이터는 사용자의 기기에만 저장됩니다.</p>
+    </div>
+
+    <h2>1. 개요</h2>
+    <p>J-news(이하 "본 앱")는 AI 기반 뉴스 브리핑 서비스를 제공하는 모바일 애플리케이션입니다. 본 개인정보처리방침은 본 앱이 사용자 정보를 어떻게 처리하는지 설명합니다.</p>
+
+    <h2>2. 수집하는 정보</h2>
+    <p>본 앱은 <strong>개인정보를 수집하지 않습니다.</strong> 회원가입, 로그인, 계정 생성이 없으며, 사용자를 식별할 수 있는 어떠한 정보도 서버로 전송하지 않습니다.</p>
+
+    <h3>기기에 로컬 저장되는 데이터</h3>
+    <p>아래 데이터는 사용자의 기기(SharedPreferences)에만 저장되며, 외부 서버로 전송되지 않습니다.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>데이터</th>
+          <th>용도</th>
+          <th>저장 위치</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>뉴스 캐시</td>
+          <td>오프라인에서 마지막 뉴스 열람</td>
+          <td>기기 로컬</td>
+        </tr>
+        <tr>
+          <td>북마크</td>
+          <td>사용자가 저장한 뉴스 보관</td>
+          <td>기기 로컬</td>
+        </tr>
+        <tr>
+          <td>구독 상태</td>
+          <td>Pro 기능 잠금해제 여부</td>
+          <td>기기 로컬</td>
+        </tr>
+        <tr>
+          <td>앱 설정</td>
+          <td>알림 스케줄 등 사용자 설정</td>
+          <td>기기 로컬</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. 앱 권한</h2>
+    <p>본 앱은 다음 권한을 사용합니다.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>권한</th>
+          <th>용도</th>
+          <th>필수 여부</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>인터넷 (INTERNET)</td>
+          <td>뉴스 데이터 서버에서 수신</td>
+          <td>필수</td>
+        </tr>
+        <tr>
+          <td>알림 (POST_NOTIFICATIONS)</td>
+          <td>뉴스 브리핑 알림 발송</td>
+          <td>선택</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. 데이터 전송 및 공유</h2>
+    <ul>
+      <li>본 앱은 사용자 개인정보를 <strong>제3자와 공유하지 않습니다.</strong></li>
+      <li>뉴스 데이터 요청 시 서버와 HTTPS 암호화 통신을 사용합니다.</li>
+      <li>서버는 사용자 식별 정보(IP, 기기 정보 등)를 저장하지 않습니다.</li>
+    </ul>
+
+    <h2>5. 광고 및 분석</h2>
+    <p>본 앱은 현재 광고 SDK 및 분석 도구를 포함하고 있지 않습니다. 향후 도입 시 본 방침을 업데이트하겠습니다.</p>
+
+    <h2>6. 아동 보호</h2>
+    <p>본 앱은 만 13세 미만의 아동을 대상으로 하지 않으며, 아동의 개인정보를 의도적으로 수집하지 않습니다.</p>
+
+    <h2>7. 데이터 삭제</h2>
+    <p>본 앱의 모든 데이터는 기기 로컬에만 저장되므로, <strong>앱을 삭제하면 모든 데이터가 자동으로 삭제</strong>됩니다. 별도의 데이터 삭제 요청은 필요하지 않습니다.</p>
+    <p>앱 삭제 전 개별 데이터를 삭제하려면:</p>
+    <ul>
+      <li>북마크: 북마크 화면에서 스와이프하여 개별 삭제</li>
+      <li>전체 데이터: 기기 설정 > 앱 > J-news > 저장공간 > 데이터 삭제</li>
+    </ul>
+
+    <h2>8. 보안</h2>
+    <p>본 앱은 다음과 같은 보안 조치를 적용하고 있습니다.</p>
+    <ul>
+      <li>모든 네트워크 통신에 HTTPS(TLS) 암호화 적용</li>
+      <li>서버 API에 인증 및 접근 제어 적용</li>
+      <li>사용자 데이터의 기기 외부 전송 없음</li>
+    </ul>
+
+    <h2>9. 개인정보처리방침 변경</h2>
+    <p>본 방침은 법률 또는 서비스 변경에 따라 수정될 수 있습니다. 중요한 변경 시 앱 내 공지 또는 본 페이지를 통해 안내합니다. 변경된 방침은 본 페이지에 게시된 시점부터 효력이 발생합니다.</p>
+
+    <h2>10. 문의</h2>
+    <p>개인정보 처리에 관한 문의사항은 아래로 연락해 주시기 바랍니다.</p>
+    <ul>
+      <li>앱 이름: J-news</li>
+      <li>이메일: xowns142857@gmail.com</li>
+    </ul>
+
+    <div class="footer">
+      &copy; 2026 J-news. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

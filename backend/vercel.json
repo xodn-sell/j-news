@@ -1,0 +1,13 @@
+{
+  "builds": [
+    { "src": "api/*.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/news", "dest": "/api/news.py" },
+    { "src": "/api/cron", "dest": "/api/cron.py" }
+  ],
+  "crons": [
+    { "path": "/api/cron?region=us", "schedule": "0 23 * * *" },
+    { "path": "/api/cron?region=kr", "schedule": "0 9 * * *" }
+  ]
+}
