@@ -3,7 +3,7 @@ import re
 import json
 from datetime import datetime
 from urllib.request import Request, urlopen
-from urllib.error import URLError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 from google.genai import types
 from .db import save_news
@@ -114,27 +114,34 @@ def _resolve_redirect(url: str, timeout: int = 3) -> str:
             return final_url
     except Exception:
         pass
-    # HEAD 실패 시 GET으로 재시도 (일부 서버는 HEAD 미지원)
-    try:
-        req = Request(url, method="GET")
-        req.add_header("User-Agent", "Mozilla/5.0")
-        resp = urlopen(req, timeout=timeout)
-        final_url = resp.url
-        if final_url and "vertexaisearch" not in final_url:
-            return final_url
-    except Exception:
-        pass
     return url
 
 
 def _resolve_all_urls(data: dict) -> dict:
-    """items의 리다이렉트 URL을 실제 URL로 교체"""
-    for item in data.get("items", []):
-        url = item.get("source_url", "")
-        if "vertexaisearch" in url:
-            resolved = _resolve_redirect(url)
-            print(f"  URL resolved: {url[:60]}... -> {resolved[:80]}")
-            item["source_url"] = resolved
+    """items의 리다이렉트 URL을 병렬로 실제 URL로 교체"""
+    items = data.get("items", [])
+    redirect_items = [(i, item) for i, item in enumerate(items)
+                      if "vertexaisearch" in item.get("source_url", "")]
+
+    if not redirect_items:
+        return data
+
+    # 5개 URL을 동시에 resolve (병렬 처리)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(_resolve_redirect, item["source_url"]): idx
+            for idx, item in redirect_items
+        }
+        for future in as_completed(futures, timeout=5):
+            idx = futures[future]
+            try:
+                resolved = future.result()
+                old_url = items[idx]["source_url"]
+                items[idx]["source_url"] = resolved
+                print(f"  URL [{idx}]: {old_url[:50]}... -> {resolved[:80]}")
+            except Exception as e:
+                print(f"  URL [{idx}] resolve failed: {e}")
+
     return data
 
 
