@@ -2,6 +2,8 @@ import os
 import re
 import json
 from datetime import datetime
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 from google import genai
 from google.genai import types
 from .db import save_news
@@ -99,53 +101,40 @@ def extract_json(raw: str) -> dict:
     raise ValueError(f"JSON 파싱 실패: {raw[:200]}")
 
 
-def _extract_grounding_urls(response) -> list[dict]:
-    """Gemini 응답의 grounding_metadata에서 실제 URL 목록 추출"""
-    urls = []
+def _resolve_redirect(url: str, timeout: int = 3) -> str:
+    """리다이렉트 URL을 따라가 최종 URL을 반환. 실패 시 원본 반환."""
+    if "vertexaisearch" not in url:
+        return url
     try:
-        for candidate in response.candidates:
-            meta = getattr(candidate, "grounding_metadata", None)
-            if not meta:
-                continue
-            chunks = getattr(meta, "grounding_chunks", None) or []
-            for chunk in chunks:
-                web = getattr(chunk, "web", None)
-                if web:
-                    uri = getattr(web, "uri", "") or ""
-                    title = getattr(web, "title", "") or ""
-                    if uri and "vertexaisearch" not in uri:
-                        urls.append({"uri": uri, "title": title})
-    except Exception as e:
-        print(f"grounding_metadata 추출 실패: {e}")
-    return urls
+        req = Request(url, method="HEAD")
+        req.add_header("User-Agent", "Mozilla/5.0")
+        resp = urlopen(req, timeout=timeout)
+        final_url = resp.url
+        if final_url and "vertexaisearch" not in final_url:
+            return final_url
+    except Exception:
+        pass
+    # HEAD 실패 시 GET으로 재시도 (일부 서버는 HEAD 미지원)
+    try:
+        req = Request(url, method="GET")
+        req.add_header("User-Agent", "Mozilla/5.0")
+        resp = urlopen(req, timeout=timeout)
+        final_url = resp.url
+        if final_url and "vertexaisearch" not in final_url:
+            return final_url
+    except Exception:
+        pass
+    return url
 
 
-def _replace_redirect_urls(data: dict, grounding_urls: list[dict]) -> dict:
-    """items의 리다이렉트 URL을 grounding에서 추출한 실제 URL로 교체"""
-    if not grounding_urls:
-        return data
-
-    items = data.get("items", [])
-    for item in items:
+def _resolve_all_urls(data: dict) -> dict:
+    """items의 리다이렉트 URL을 실제 URL로 교체"""
+    for item in data.get("items", []):
         url = item.get("source_url", "")
-        # vertexaisearch 리다이렉트 URL이면 교체 시도
-        if "vertexaisearch" in url or not url.startswith("http"):
-            label = item.get("source_label", "").lower()
-            # grounding URL 중 매체명과 매칭되는 것을 찾기
-            best = None
-            for g in grounding_urls:
-                g_title = g["title"].lower()
-                if label and label in g_title:
-                    best = g["uri"]
-                    break
-            # 매칭 실패 시 아직 사용하지 않은 첫 번째 URL 사용
-            if not best and grounding_urls:
-                best = grounding_urls.pop(0)["uri"]
-            elif best:
-                grounding_urls[:] = [g for g in grounding_urls if g["uri"] != best]
-            if best:
-                item["source_url"] = best
-
+        if "vertexaisearch" in url:
+            resolved = _resolve_redirect(url)
+            print(f"  URL resolved: {url[:60]}... -> {resolved[:80]}")
+            item["source_url"] = resolved
     return data
 
 
@@ -171,10 +160,8 @@ def fetch_and_store(region: str, category: str = "general"):
     if "items" not in data:
         raise ValueError("응답에 items 필드가 없습니다")
 
-    # grounding metadata에서 실제 URL 추출 후 리다이렉트 URL 교체
-    grounding_urls = _extract_grounding_urls(response)
-    print(f"  grounding URLs 발견: {len(grounding_urls)}개")
-    data = _replace_redirect_urls(data, grounding_urls)
+    # 리다이렉트 URL을 실제 URL로 변환
+    data = _resolve_all_urls(data)
 
     # summary 필드에 구조화된 JSON 문자열 저장
     summary = json.dumps(data, ensure_ascii=False)
