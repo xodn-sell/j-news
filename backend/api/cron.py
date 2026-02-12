@@ -10,6 +10,7 @@ from lib.db import init_db
 from lib.gemini import fetch_and_store
 
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
+VALID_CATEGORIES = ("general", "tech", "economy", "entertainment")
 
 
 class handler(BaseHTTPRequestHandler):
@@ -40,24 +41,30 @@ class handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         region = params.get("region", [None])[0]
+        category = params.get("category", [None])[0]
 
         try:
-            if region:
-                if region not in ("us", "kr"):
-                    raise ValueError("Invalid region")
-                for cat in ["general", "tech", "economy", "entertainment"]:
-                    fetch_and_store(region, cat)
+            if region and region not in ("us", "kr"):
+                raise ValueError("Invalid region")
+            if category and category not in VALID_CATEGORIES:
+                raise ValueError("Invalid category")
+
+            if region and category:
+                # 단일 리전 + 단일 카테고리 (cron에서 호출)
+                fetch_and_store(region, category)
+            elif region:
+                # 단일 리전, 모든 카테고리 (하위 호환)
+                fetch_and_store(region, category or "general")
             else:
-                # 지정 안 하면 전체 갱신
+                # 전체 갱신 - general만 (안전장치)
                 for r in ["us", "kr"]:
-                    for cat in ["general", "tech", "economy", "entertainment"]:
-                        fetch_and_store(r, cat)
+                    fetch_and_store(r, "general")
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(
-                {"status": "ok", "message": "뉴스가 성공적으로 갱신되었습니다."},
+                {"status": "ok", "message": f"뉴스 갱신 완료: {region or 'all'}/{category or 'general'}"},
                 ensure_ascii=False,
             ).encode("utf-8"))
         except Exception as e:
