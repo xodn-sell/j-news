@@ -21,6 +21,18 @@ def init_db():
                 created_at TEXT NOT NULL
             )
         """)
+        # 기존 테이블에 category 컬럼이 없으면 추가
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'news' AND column_name = 'category'
+                ) THEN
+                    ALTER TABLE news ADD COLUMN category TEXT NOT NULL DEFAULT 'general';
+                END IF;
+            END $$;
+        """)
         conn.commit()
         cur.close()
     finally:
