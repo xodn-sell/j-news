@@ -116,19 +116,6 @@ def fetch_and_store(region: str, category: str = "general"):
     raw = response.text or ""
     summary = clean_summary(raw)
 
-    # 리다이렉트 URL 해소 및 검증
-    url_pattern = re.compile(r'\((https?://[^\s\)]+)\)')
-    urls = url_pattern.findall(summary)
-    for url in urls:
-        real_url = resolve_redirect(url)
-        if real_url != url:
-            summary = summary.replace(url, real_url)
-            url = real_url
-        # URL 존재 여부 검증 — 깨진 URL은 제거하고 출처 텍스트만 남김
-        if not validate_url(url):
-            summary = summary.replace(f" ({url})", "")
-            summary = summary.replace(f"({url})", "")
-
     sources = parse_sources_json(summary)
     save_news(region, category, summary, sources)
     print(f"[{datetime.now()}] {region} [{category}] 뉴스 저장 완료")
