@@ -7,13 +7,13 @@
     { "src": "/api/cron", "dest": "/api/cron.py" }
   ],
   "crons": [
-    { "path": "/api/cron?region=us&category=general", "schedule": "0 23 * * *" },
-    { "path": "/api/cron?region=us&category=tech", "schedule": "1 23 * * *" },
-    { "path": "/api/cron?region=us&category=economy", "schedule": "2 23 * * *" },
-    { "path": "/api/cron?region=us&category=entertainment", "schedule": "3 23 * * *" },
-    { "path": "/api/cron?region=kr&category=general", "schedule": "0 9 * * *" },
-    { "path": "/api/cron?region=kr&category=tech", "schedule": "1 9 * * *" },
-    { "path": "/api/cron?region=kr&category=economy", "schedule": "2 9 * * *" },
-    { "path": "/api/cron?region=kr&category=entertainment", "schedule": "3 9 * * *" }
+    { "path": "/api/cron?region=us&category=general", "schedule": "0 23 * * 1-5" },
+    { "path": "/api/cron?region=us&category=tech", "schedule": "1 23 * * 1-5" },
+    { "path": "/api/cron?region=us&category=economy", "schedule": "2 23 * * 1-5" },
+    { "path": "/api/cron?region=us&category=entertainment", "schedule": "3 23 * * 1-5" },
+    { "path": "/api/cron?region=kr&category=general", "schedule": "0 9 * * 1-5" },
+    { "path": "/api/cron?region=kr&category=tech", "schedule": "1 9 * * 1-5" },
+    { "path": "/api/cron?region=kr&category=economy", "schedule": "2 9 * * 1-5" },
+    { "path": "/api/cron?region=kr&category=entertainment", "schedule": "3 9 * * 1-5" }
   ]
 }
