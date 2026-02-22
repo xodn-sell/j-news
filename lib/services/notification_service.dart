@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
-// 알림 탭 시 콜백 (main에서 네비게이션에 활용)
 typedef NotificationTapCallback = void Function(String? payload);
 
 class NotificationService {
@@ -14,62 +16,31 @@ class NotificationService {
     onTap = onNotificationTap;
 
     tz_data.initializeTimeZones();
-    // 디바이스 타임존 감지
     try {
-      final timeZoneName = DateTime.now().timeZoneName;
-      // 일반적인 한국/미국 타임존 매핑
-      final tzMap = {
-        'KST': 'Asia/Seoul',
-        'JST': 'Asia/Tokyo',
-        'EST': 'America/New_York',
-        'EDT': 'America/New_York',
-        'CST': 'America/Chicago',
-        'CDT': 'America/Chicago',
-        'MST': 'America/Denver',
-        'MDT': 'America/Denver',
-        'PST': 'America/Los_Angeles',
-        'PDT': 'America/Los_Angeles',
-      };
-      final location = tzMap[timeZoneName] ?? 'Asia/Seoul';
-      tz.setLocalLocation(tz.getLocation(location));
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
     } catch (_) {
       tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
     }
 
-    // Android 설정
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // iOS 설정
     const iOS = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    // macOS 설정
-    const macOS = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    final settings = InitializationSettings(
-      android: android,
-      iOS: iOS,
-      macOS: macOS,
-    );
-
     await _plugin.initialize(
-      settings,
+      settings: const InitializationSettings(android: android, iOS: iOS),
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    // Android 알림 권한 요청
+    // POST_NOTIFICATIONS 권한만 여기서 요청 (Android 13+)
+    // SCHEDULE_EXACT_ALARM은 스케줄 등록 시 자동으로 체크해서 처리
     if (Platform.isAndroid) {
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
     }
   }
 
@@ -77,54 +48,50 @@ class NotificationService {
     onTap?.call(response.payload);
   }
 
-  static Future<void> scheduleDailyNews() async {
-    // 기존 스케줄 초기화
-    await _plugin.cancelAll();
-
-    // 매일 오전 8시 - 미국 뉴스
-    await _scheduleDaily(
-      id: 0,
-      hour: 8,
-      title: '🇺🇸 J-news 미국 브리핑',
-      body: '오늘의 미국 주요 뉴스가 준비되었습니다. 확인해보세요!',
-      payload: 'us',
-    );
-
-    // 매일 오후 6시 - 한국 뉴스
-    await _scheduleDaily(
-      id: 1,
-      hour: 18,
-      title: '🇰🇷 J-news 한국 브리핑',
-      body: '오늘의 한국 주요 뉴스가 준비되었습니다. 확인해보세요!',
-      payload: 'kr',
-    );
-  }
-
-  static Future<void> _scheduleDaily({
-    required int id,
-    required int hour,
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour);
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+  /// 현재 알림 권한 상태 반환
+  static Future<Map<String, bool>> getPermissionStatus() async {
+    if (!Platform.isAndroid) {
+      return {'notification': true, 'exactAlarm': true, 'batteryOptimization': true};
     }
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduled,
-      const NotificationDetails(
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    final notification = await androidPlugin?.areNotificationsEnabled() ?? false;
+    final exactAlarm = await androidPlugin?.canScheduleExactNotifications() ?? false;
+    final batteryOptIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+
+    return {
+      'notification': notification,
+      'exactAlarm': exactAlarm,
+      'batteryOptimization': batteryOptIgnored,
+    };
+  }
+
+  /// 알림 권한 요청 (앱 정보 화면 등에서 명시적으로 호출)
+  static Future<void> requestPermissions() async {
+    if (!Platform.isAndroid) return;
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
+    await Permission.ignoreBatteryOptimizations.request();
+  }
+
+  /// 즉시 테스트 알림 전송
+  static Future<void> sendTestNotification() async {
+    await _plugin.show(
+      id: 99,
+      title: '🔔 J-news 알림 테스트',
+      body: '알림이 정상적으로 작동하고 있어요!',
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'news_briefing',
-          'J-news',
-          channelDescription: '매일 뉴스 요약 알림',
+          'J-news 뉴스 브리핑',
+          channelDescription: '평일 뉴스 요약 알림',
           importance: Importance.high,
           priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
@@ -132,10 +99,113 @@ class NotificationService {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: payload,
     );
+  }
+
+  static Future<void> scheduleDailyNews() async {
+    try {
+      await _plugin.cancelAll();
+    } catch (e) {
+      debugPrint('[J-news] cancelAll 실패: $e');
+    }
+
+    // 정확한 알람 권한 여부 확인 → 없으면 inexact로 fallback
+    bool canExact = false;
+    if (Platform.isAndroid) {
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      canExact = await androidPlugin?.canScheduleExactNotifications() ?? false;
+    } else {
+      canExact = true;
+    }
+
+    debugPrint('[J-news] 정확한 알람 권한: $canExact');
+
+    // 화~토 오전 8시 - 미국 뉴스 (id 0~4)
+    final usWeekdays = [
+      DateTime.tuesday,
+      DateTime.wednesday,
+      DateTime.thursday,
+      DateTime.friday,
+      DateTime.saturday,
+    ];
+    for (int i = 0; i < usWeekdays.length; i++) {
+      await _scheduleWeekday(
+        id: i,
+        hour: 8,
+        weekday: usWeekdays[i],
+        title: '🇺🇸 미국 뉴스 브리핑',
+        body: '오늘의 미국 주요 뉴스가 준비되었습니다.',
+        payload: 'us',
+        useExactAlarm: canExact,
+      );
+    }
+
+    // 월~금 오후 6시 - 한국 뉴스 (id 5~9)
+    for (int weekday = DateTime.monday; weekday <= DateTime.friday; weekday++) {
+      await _scheduleWeekday(
+        id: weekday + 4,
+        hour: 18,
+        weekday: weekday,
+        title: '🇰🇷 한국 뉴스 브리핑',
+        body: '오늘의 한국 주요 뉴스가 준비되었습니다.',
+        payload: 'kr',
+        useExactAlarm: canExact,
+      );
+    }
+
+    debugPrint('[J-news] 알림 스케줄 등록 완료 (US: 화~토 08:00 / KR: 월~금 18:00)');
+  }
+
+  static Future<void> _scheduleWeekday({
+    required int id,
+    required int hour,
+    required int weekday,
+    required String title,
+    required String body,
+    required bool useExactAlarm,
+    String? payload,
+  }) async {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour);
+
+    while (scheduled.weekday != weekday) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 7));
+    }
+
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduled,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'news_briefing',
+            'J-news 뉴스 브리핑',
+            channelDescription: '평일 뉴스 요약 알림',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        androidScheduleMode: useExactAlarm
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: payload,
+      );
+      debugPrint('[J-news] 알림 등록 (id=$id, ${scheduled.toString()})');
+    } catch (e) {
+      debugPrint('[J-news] 알림 스케줄 실패 (id=$id): $e');
+    }
   }
 }

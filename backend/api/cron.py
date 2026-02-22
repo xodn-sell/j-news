@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -21,7 +21,7 @@ class handler(BaseHTTPRequestHandler):
         self._handle()
 
     def _handle(self):
-        # 인증 검증: Vercel Cron은 Authorization 헤더에 Bearer <CRON_SECRET>을 보냄
+        # ?몄쬆 寃利? Vercel Cron? Authorization ?ㅻ뜑??Bearer <CRON_SECRET>??蹂대깂
         auth_header = self.headers.get("Authorization", "")
         expected = f"Bearer {CRON_SECRET}"
 
@@ -48,7 +48,7 @@ class handler(BaseHTTPRequestHandler):
                 for cat in ["general", "tech", "economy", "entertainment"]:
                     fetch_and_store(region, cat)
             else:
-                # 지정 안 하면 전체 갱신
+                # 吏?????섎㈃ ?꾩껜 媛깆떊
                 for r in ["us", "kr"]:
                     for cat in ["general", "tech", "economy", "entertainment"]:
                         fetch_and_store(r, cat)
@@ -57,7 +57,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(
-                {"status": "ok", "message": "뉴스가 성공적으로 갱신되었습니다."},
+                {"status": "ok", "message": "?댁뒪媛 ?깃났?곸쑝濡?媛깆떊?섏뿀?듬땲??"},
                 ensure_ascii=False,
             ).encode("utf-8"))
         except Exception as e:
@@ -65,6 +65,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(
-                {"detail": f"뉴스 갱신 실패: {str(e)}"},
+                {"detail": f"?댁뒪 媛깆떊 ?ㅽ뙣: {str(e)}"},
                 ensure_ascii=False,
             ).encode("utf-8"))
+

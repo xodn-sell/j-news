@@ -29,15 +29,4 @@ class CacheService {
     if (ts == null) return -1;
     return DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ts)).inMinutes;
   }
-
-  /// Pro 상태 저장/조회
-  static Future<void> setProStatus(bool isPro) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_pro', isPro);
-  }
-
-  static Future<bool> getProStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('is_pro') ?? false;
-  }
 }

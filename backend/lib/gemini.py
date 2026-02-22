@@ -1,96 +1,155 @@
+﻿import json
 import os
 import re
-import json
-import httpx
 from datetime import datetime
+
+import httpx
 from google import genai
 from google.genai import types
-from .db import save_news
 
+from .db import save_news
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-SYSTEM_INSTRUCTION = """너는 뉴스 요약 봇이다.
-절대 규칙:
-- 인사말 금지 (알겠습니다, 제공해 드리겠습니다, 죄송합니다 등)
-- 서론/부연 설명 금지
-- 첫 줄부터 바로 "1. **제목**" 으로 시작
-- 지정된 형식만 출력
-- 한국어로 작성
-- 출처 URL은 반드시 실제 뉴스 기사의 원본 URL을 포함 (리다이렉트 URL 금지)
-- 원문 표현을 그대로 사용하지 말고, 팩트만 간결하게 전달"""
+SYSTEM_INSTRUCTION = """
+너는 뉴스 초보자를 위한 뉴스 브리핑 도우미다.
+반드시 아래 JSON 형식으로만 답해라.
+
+{
+  "items": [
+    {
+      "title": "...",
+      "body": "...",
+      "source_label": "...",
+      "source_url": "https://...",
+      "glossary": [
+        {"term": "...", "definition": "..."}
+      ]
+    }
+  ],
+  "insight": "..."
+}
+
+규칙:
+- items는 5개를 목표로 작성한다.
+- source_url은 실제 기사 원문 URL을 넣는다.
+- glossary는 각 뉴스에 1~2개.
+- 문장은 한국어로 간결하게.
+- JSON 외 텍스트 금지.
+"""
 
 PROMPTS = {
     "us": {
-        "general": "오늘의 미국 주요 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "tech": "오늘의 미국 IT/테크 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "economy": "오늘의 미국 경제/금융 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "entertainment": "오늘의 미국 연예/문화/스포츠 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
+        "general": "오늘의 미국 주요 뉴스를 5개 선정해 요약해줘.",
+        "tech": "오늘의 미국 IT/테크 뉴스를 5개 선정해 요약해줘.",
+        "economy": "오늘의 미국 경제/금융 뉴스를 5개 선정해 요약해줘.",
+        "entertainment": "오늘의 미국 연예/문화/스포츠 뉴스를 5개 선정해 요약해줘.",
     },
     "kr": {
-        "general": "오늘의 한국 주요 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "tech": "오늘의 한국 IT/테크 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "economy": "오늘의 한국 경제/금융 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-        "entertainment": "오늘의 한국 연예/문화/스포츠 뉴스 5개를 검색해서 아래 형식 그대로 출력해.",
-    }
+        "general": "오늘의 한국 주요 뉴스를 5개 선정해 요약해줘.",
+        "tech": "오늘의 한국 IT/테크 뉴스를 5개 선정해 요약해줘.",
+        "economy": "오늘의 한국 경제/금융 뉴스를 5개 선정해 요약해줘.",
+        "entertainment": "오늘의 한국 연예/문화/스포츠 뉴스를 5개 선정해 요약해줘.",
+    },
 }
-
-FORMAT_INSTRUCTION = """
-각 뉴스의 실제 원본 기사 URL을 반드시 포함해.
-
-1. **제목**
-요약 1~2문장 (최대 80자)
-출처: 매체명 (https://실제기사URL)
-
-... (반복) ...
-
-📌 시사점: 1~2문장
-"""
-
-
-def clean_summary(raw: str) -> str:
-    match = re.search(r'1\.\s*\*\*', raw)
-    if match:
-        return raw[match.start():]
-    return raw
-
-
-def parse_sources_json(text: str) -> str:
-    sources = []
-    pattern = re.compile(r'출처:\s*(.+?)\s*\((https?://[^\s\)]+)\)')
-    for m in pattern.finditer(text):
-        sources.append({"title": m.group(1).strip(), "link": m.group(2).strip()})
-    return json.dumps(sources, ensure_ascii=False)
 
 
 def resolve_redirect(url: str) -> str:
-    """Google 리다이렉트 URL을 실제 URL로 해소"""
+    """Resolve known redirect URLs to final destination."""
     google_domains = ["google.com/url", "vertexaisearch.cloud.google.com", "news.google.com"]
     if not any(domain in url for domain in google_domains):
         return url
     try:
-        with httpx.Client(follow_redirects=True, timeout=10.0) as c:
-            resp = c.head(url)
+        with httpx.Client(follow_redirects=True, timeout=10.0) as client:
+            resp = client.head(url)
             return str(resp.url)
     except Exception:
         return url
 
 
-def validate_url(url: str) -> bool:
-    """HTTP HEAD 요청으로 URL 존재 여부 검증"""
+def _extract_json_object(text: str):
+    text = (text or "").strip()
+    if not text:
+        return None
+
+    # 1) direct JSON
     try:
-        with httpx.Client(follow_redirects=True, timeout=10.0) as c:
-            resp = c.head(url)
-            return resp.status_code < 400
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
     except Exception:
-        return False
+        pass
+
+    # 2) fenced JSON
+    fenced = re.sub(r"^```json\s*|^```|```$", "", text, flags=re.IGNORECASE | re.MULTILINE).strip()
+    if fenced != text:
+        try:
+            data = json.loads(fenced)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    # 3) object fragment
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        fragment = text[start : end + 1]
+        try:
+            data = json.loads(fragment)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            return None
+
+    return None
+
+
+def _normalize_payload(payload: dict) -> dict:
+    items = payload.get("items")
+    if not isinstance(items, list):
+        items = []
+
+    normalized_items = []
+    for item in items[:5]:
+        if not isinstance(item, dict):
+            continue
+        glossary = item.get("glossary")
+        if not isinstance(glossary, list):
+            glossary = []
+        normalized_glossary = []
+        for g in glossary[:2]:
+            if isinstance(g, dict):
+                normalized_glossary.append(
+                    {
+                        "term": str(g.get("term", "")).strip(),
+                        "definition": str(g.get("definition", "")).strip(),
+                    }
+                )
+        normalized_items.append(
+            {
+                "title": str(item.get("title", "")).strip(),
+                "body": str(item.get("body", "")).strip(),
+                "source_label": str(item.get("source_label", "")).strip(),
+                "source_url": str(item.get("source_url", "")).strip(),
+                "glossary": normalized_glossary,
+            }
+        )
+
+    return {
+        "items": normalized_items,
+        "insight": str(payload.get("insight", "")).strip(),
+    }
 
 
 def fetch_and_store(region: str, category: str = "general"):
-    """Gemini로 뉴스 요약을 생성하고 DB에 저장"""
-    print(f"[{datetime.now()}] {region} [{category}] 뉴스 가져오는 중...")
+    """Fetch briefing via Gemini and save into DB."""
+    print(f"[{datetime.now()}] {region} [{category}] fetching...")
 
-    prompt = PROMPTS[region][category] + FORMAT_INSTRUCTION
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is missing")
+
+    prompt = PROMPTS[region][category]
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     response = client.models.generate_content(
@@ -101,22 +160,27 @@ def fetch_and_store(region: str, category: str = "general"):
             system_instruction=SYSTEM_INSTRUCTION,
         ),
     )
-    raw = response.text or ""
-    summary = clean_summary(raw)
 
-    # 리다이렉트 URL 해소 및 검증
-    url_pattern = re.compile(r'\((https?://[^\s\)]+)\)')
-    urls = url_pattern.findall(summary)
-    for url in urls:
-        real_url = resolve_redirect(url)
-        if real_url != url:
-            summary = summary.replace(url, real_url)
-            url = real_url
-        # URL 존재 여부 검증 — 깨진 URL은 제거하고 출처 텍스트만 남김
-        if not validate_url(url):
-            summary = summary.replace(f" ({url})", "")
-            summary = summary.replace(f"({url})", "")
+    payload = _extract_json_object(response.text or "")
+    if payload is None:
+        raise RuntimeError("Model response was not valid JSON")
 
-    sources = parse_sources_json(summary)
-    save_news(region, category, summary, sources)
-    print(f"[{datetime.now()}] {region} [{category}] 뉴스 저장 완료")
+    data = _normalize_payload(payload)
+
+    for item in data.get("items", []):
+        url = item.get("source_url", "")
+        if url:
+            item["source_url"] = resolve_redirect(url)
+
+    full_json_str = json.dumps(data, ensure_ascii=False)
+    sources_json = json.dumps(
+        [
+            {"title": item.get("source_label", ""), "link": item.get("source_url", "")}
+            for item in data.get("items", [])
+        ],
+        ensure_ascii=False,
+    )
+
+    save_news(region, category, full_json_str, sources_json)
+    print(f"[{datetime.now()}] {region} [{category}] saved")
+
