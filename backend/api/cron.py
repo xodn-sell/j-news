@@ -45,12 +45,12 @@ class handler(BaseHTTPRequestHandler):
             if region:
                 if region not in ("us", "kr"):
                     raise ValueError("Invalid region")
-                for cat in ["general", "tech", "economy", "entertainment"]:
+                for cat in ["general", "tech", "economy", "entertainment", "sports", "politics", "health", "science"]:
                     fetch_and_store(region, cat)
             else:
                 # 吏?????섎㈃ ?꾩껜 媛깆떊
                 for r in ["us", "kr"]:
-                    for cat in ["general", "tech", "economy", "entertainment"]:
+                    for cat in ["general", "tech", "economy", "entertainment", "sports", "politics", "health", "science"]:
                         fetch_and_store(r, cat)
 
             self.send_response(200)

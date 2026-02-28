@@ -157,6 +157,34 @@ class NotificationService {
     debugPrint('[J-news] 알림 스케줄 등록 완료 (US: 화~토 08:00 / KR: 월~금 18:00)');
   }
 
+  /// 최신 뉴스를 기반으로 알림 메시지 업데이트
+  static Future<void> updateNotificationWithNews(String region, String topNewsTitle) async {
+    bool canExact = false;
+    if (Platform.isAndroid) {
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      canExact = await androidPlugin?.canScheduleExactNotifications() ?? false;
+    } else {
+      canExact = true;
+    }
+
+    final isUS = region == 'us';
+    final title = isUS ? '🇺🇸 미국 핵심 뉴스 브리핑' : '🇰🇷 한국 핵심 뉴스 브리핑';
+    final body = topNewsTitle.length > 40 ? '${topNewsTitle.substring(0, 37)}...' : topNewsTitle;
+
+    if (isUS) {
+      final usWeekdays = [DateTime.tuesday, DateTime.wednesday, DateTime.thursday, DateTime.friday, DateTime.saturday];
+      for (int i = 0; i < usWeekdays.length; i++) {
+        await _scheduleWeekday(id: i, hour: 8, weekday: usWeekdays[i], title: title, body: body, payload: 'us', useExactAlarm: canExact);
+      }
+    } else {
+      for (int weekday = DateTime.monday; weekday <= DateTime.friday; weekday++) {
+        await _scheduleWeekday(id: weekday + 4, hour: 18, weekday: weekday, title: title, body: body, payload: 'kr', useExactAlarm: canExact);
+      }
+    }
+    debugPrint('[J-news] $region 알림 내용이 최신 뉴스로 업데이트되었습니다: $body');
+  }
+
   static Future<void> _scheduleWeekday({
     required int id,
     required int hour,

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib.db import get_latest_news, init_db
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
-VALID_CATEGORIES = ("general", "tech", "economy", "entertainment")
+VALID_CATEGORIES = ("general", "tech", "economy", "entertainment", "sports", "politics", "health", "science")
 
 # In-memory rate limiting: max 30 req / 60s per IP
 RATE_LIMIT = 30
