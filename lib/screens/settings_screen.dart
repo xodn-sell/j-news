@@ -140,7 +140,7 @@ class SettingsScreen extends StatelessWidget {
                               border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
                             ),
                             child: Text(
-                              'v1.3.0',
+                              'v1.6.0',
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.8)),
                             ),
                           ),
@@ -190,7 +190,7 @@ class SettingsScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            'J-NEWS v1.3.0',
+                            'J-NEWS v1.6.0',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: subColor),
                           ),
                           const SizedBox(height: 4),

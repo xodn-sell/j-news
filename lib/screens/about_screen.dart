@@ -11,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
 
-  static const String _appVersion = '1.3.0';
+  static const String _appVersion = '1.6.0';
   static const String _contactEmail = 'xowns142857@gmail.com';
   static const String _developerName = 'k-jieum';
   static const String _privacyUrl = 'https://backend-ruby-chi-85.vercel.app/privacy';
