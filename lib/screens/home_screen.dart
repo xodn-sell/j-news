@@ -1,233 +1,269 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'news_tab.dart';
+import 'settings_screen.dart';
 import 'bookmark_screen.dart';
-import 'about_screen.dart';
+import '../services/news_session.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String? initialRegion;
-
-  const HomeScreen({super.key, this.initialRegion});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
-  String _selectedCategory = 'general';
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  int _currentPage = 0;
+  int _totalPages = 0;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'id': 'general', 'label': '종합', 'icon': Icons.public},
-    {'id': 'politics', 'label': '정치', 'icon': Icons.account_balance_rounded},
-    {'id': 'economy', 'label': '경제', 'icon': Icons.trending_up},
-    {'id': 'tech', 'label': '테크', 'icon': Icons.memory},
-    {'id': 'science', 'label': '과학', 'icon': Icons.science_rounded},
-    {'id': 'sports', 'label': '스포츠', 'icon': Icons.sports_soccer_rounded},
-    {'id': 'health', 'label': '건강', 'icon': Icons.favorite_rounded},
-    {'id': 'entertainment', 'label': '연예', 'icon': Icons.movie_outlined},
-  ];
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
+  Timer? _countdownTimer;
+
+  String _todayLabel() {
+    final now = DateTime.now();
+    return '${now.month}월 ${now.day}일';
+  }
+
+  String _sessionTitle() => '${NewsSession.currentSessionLabel()} 브리핑';
 
   @override
   void initState() {
     super.initState();
-    int initialTab;
-    if (widget.initialRegion == 'kr') {
-      initialTab = 1;
-    } else if (widget.initialRegion == 'us') {
-      initialTab = 0;
-    } else {
-      final hour = DateTime.now().hour;
-      initialTab = (hour >= 18 && hour < 24) ? 1 : 0;
-    }
-    _tabController = TabController(length: 2, vsync: this, initialIndex: initialTab);
-  }
+    FirebaseAnalytics.instance.logEvent(name: 'home_shown');
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _pulseAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.linear),
+    );
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 6) return '고요한 새벽이에요';
-    if (hour < 9) return '좋은 아침이에요';
-    if (hour < 12) return '오전 브리핑 준비됐어요';
-    if (hour < 14) return '점심 시간 브리핑';
-    if (hour < 18) return '오후의 주요 뉴스';
-    if (hour < 21) return '저녁 브리핑 시간';
-    return '오늘의 마지막 브리핑';
-  }
-
-  String _subGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 6) return 'AI가 밤사이 세상 소식을 정리했어요';
-    if (hour < 12) return 'AI가 오늘의 핵심 뉴스를 정리했어요';
-    if (hour < 18) return 'AI가 실시간 뉴스를 분석하고 있어요';
-    return 'AI가 하루를 마무리하는 브리핑을 준비했어요';
+    // 세션 카운트다운: 30초마다 라벨 갱신 (다음 세션 시작 시 자동 전환)
+    _countdownTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _pulseController.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  void _onPageChanged(int current, int total) {
+    if (!mounted) return;
+    setState(() {
+      _currentPage = current;
+      _totalPages = total;
+    });
+  }
+
+  void _openSettings() {
+    FirebaseAnalytics.instance.logEvent(name: 'settings_opened');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
+  void _openBookmarks() {
+    FirebaseAnalytics.instance.logEvent(name: 'bookmarks_opened');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const BookmarkScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final scaffoldBg = isDark ? theme.colorScheme.surface : const Color(0xFFF5F6FA);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: scaffoldBg,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 상단 헤더 영역 슬림화
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
-              child: Row(
+            // ── 헤더 전체 (브랜드 행 + 진행바)
+            Container(
+              decoration: BoxDecoration(
+                gradient: isDark
+                    ? null
+                    : const LinearGradient(
+                        colors: [Colors.white, Color(0xFFEEF4FF)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                color: isDark ? theme.colorScheme.surface : null,
+                boxShadow: isDark ? null : [
+                  BoxShadow(color: const Color(0xFF0D1117).withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // ── 톱 브랜드 행 (38px) — editorial 절제 ──
+                  SizedBox(
+                    height: 38,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
+                        // 왼쪽: J-NEWS 워드마크 + pulse
+                        Positioned(
+                          left: 20,
+                          child: Row(
+                            children: [
+                              Text(
                                 'J-NEWS',
                                 style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w900,
-                                  color: theme.colorScheme.primary,
-                                  letterSpacing: 2,
+                                  letterSpacing: 0.6,
+                                  color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.6),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 6, height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF34C759),
-                                shape: BoxShape.circle,
+                              const SizedBox(width: 6),
+                              AnimatedBuilder(
+                                animation: _pulseAnim,
+                                builder: (_, __) => Container(
+                                  width: 5, height: 5,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF34C759),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF34C759).withValues(alpha: (1.0 - _pulseAnim.value) * 0.4),
+                                        blurRadius: _pulseAnim.value * 5,
+                                        spreadRadius: _pulseAnim.value * 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _greeting(),
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 21,
-                            letterSpacing: -0.8,
+
+                        // 오른쪽: 북마크 + 설정
+                        Positioned(
+                          right: 12,
+                          child: Row(
+                            children: [
+                              _HeaderIconButton(icon: Icons.bookmark_outline_rounded, onTap: _openBookmarks, theme: theme),
+                              const SizedBox(width: 6),
+                              _HeaderIconButton(icon: Icons.tune_rounded, onTap: _openSettings, theme: theme),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // 액션 버튼 그룹 슬림화
-                  Row(
-                    children: [
-                      _buildHeaderButton(
-                        context, 
-                        icon: Icons.bookmark_rounded, 
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const BookmarkScreen()),
+
+                  // ── 에디토리얼 디스플레이: 세션 타이틀 (잡지 헤드라인) ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 메타: 날짜
+                              Text(
+                                _todayLabel(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: const Color(0xFF0052CC).withValues(alpha: isDark ? 0.85 : 0.75),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              // 디스플레이: 세션 브리핑
+                              Text(
+                                _sessionTitle(),
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.8,
+                                  height: 1.15,
+                                  color: isDark ? Colors.white : const Color(0xFF0D1117),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              // 카운트다운: 다음 세션까지
+                              Text(
+                                '다음 ${NewsSession.nextSessionLabel()} 브리핑까지 ${NewsSession.nextSessionCountdown()}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -0.1,
+                                  color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        theme: theme,
-                      ),
-                      const SizedBox(width: 4),
-                      _buildHeaderButton(
-                        context, 
-                        icon: Icons.info_rounded, 
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AboutScreen()),
+                        // 우측 메타: AI 큐레이션 라벨
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.15),
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'AI 큐레이션',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.55),
+                            ),
+                          ),
                         ),
-                        theme: theme,
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+
+                  // 진행 바 (3px)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final progress = _totalPages > 0 ? (_currentPage + 1) / _totalPages : 0.0;
+                      return Stack(
+                        children: [
+                          Container(
+                            height: 3,
+                            width: constraints.maxWidth,
+                            color: const Color(0xFF0D1117).withValues(alpha: isDark ? 0.12 : 0.06),
+                          ),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOut,
+                            height: 3,
+                            width: constraints.maxWidth * progress,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF0052CC),
+                              borderRadius: BorderRadius.only(topRight: Radius.circular(2), bottomRight: Radius.circular(2)),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
-
-            // 리전 선택기 (US / KR) — 한 줄
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  isScrollable: false,
-                  indicator: BoxDecoration(
-                    color: isDark ? theme.colorScheme.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(9),
-                    boxShadow: isDark ? null : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 6,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  dividerColor: Colors.transparent,
-                  labelPadding: EdgeInsets.zero,
-                  labelColor: isDark ? Colors.white : theme.colorScheme.onSurface,
-                  unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                  tabs: const [
-                    Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text('🇺🇸', style: TextStyle(fontSize: 15)), SizedBox(width: 6), Text('US', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5))])),
-                    Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text('🇰🇷', style: TextStyle(fontSize: 15)), SizedBox(width: 6), Text('KR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5))])),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // 카테고리 칩 — 한 줄
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (context, index) {
-                  final cat = _categories[index];
-                  final isSelected = _selectedCategory == cat['id'];
-                  return _buildCategoryChip(cat, isSelected, theme, isDark);
-                },
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // 뉴스 콘텐츠 영역
+            // 뉴스 콘텐츠
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(), // 카테고리와의 충돌 방지
-                children: [
-                  NewsTab(key: ValueKey('us_$_selectedCategory'), region: 'us', category: _selectedCategory, autoLoad: true),
-                  NewsTab(key: ValueKey('kr_$_selectedCategory'), region: 'kr', category: _selectedCategory, autoLoad: true),
-                ],
+              child: NewsTab(
+                region: 'world',
+                category: 'general',
+                autoLoad: true,
+                onPageChanged: _onPageChanged,
               ),
             ),
           ],
@@ -235,71 +271,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+}
 
-  Widget _buildHeaderButton(BuildContext context, {required IconData icon, required VoidCallback onTap, required ThemeData theme}) {
+class _HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final ThemeData theme;
+
+  const _HeaderIconButton({required this.icon, required this.onTap, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          width: 36, height: 36,
           decoration: BoxDecoration(
-            border: Border.all(color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
-            borderRadius: BorderRadius.circular(14),
+            color: const Color(0xFF0D1117).withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(Map<String, dynamic> cat, bool isSelected, ThemeData theme, bool isDark) {
-    return GestureDetector(
-      onTap: () => setState(() => _selectedCategory = cat['id']),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary
-              : isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              cat['icon'] as IconData,
-              size: 15,
-              color: isSelected
-                  ? Colors.white
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.45),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              cat['label'] as String,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.65),
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
+          child: Icon(icon, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
         ),
       ),
     );

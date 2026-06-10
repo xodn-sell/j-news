@@ -19,6 +19,17 @@ RATE_WINDOW = 60
 _request_counts = defaultdict(list)
 
 
+def _safe_json(value, fallback=None):
+    if fallback is None:
+        fallback = []
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return fallback
+
+
 def _get_cors_origin(request_origin: str) -> str:
     """Return allowed origin or empty string."""
     if not ALLOWED_ORIGINS or ALLOWED_ORIGINS == [""]:
@@ -124,8 +135,8 @@ class handler(BaseHTTPRequestHandler):
         region = params.get("region", [None])[0]
         category = params.get("category", ["general"])[0]
 
-        if region not in ("us", "kr"):
-            self._json_response(400, {"detail": "region must be 'us' or 'kr'."})
+        if region not in ("us", "kr", "world"):
+            self._json_response(400, {"detail": "region must be 'us', 'kr', or 'world'."})
             return
 
         if category not in VALID_CATEGORIES:
@@ -145,13 +156,14 @@ class handler(BaseHTTPRequestHandler):
         # Keep compatibility with existing app/client contracts.
         payload = {
             "summary": json.dumps(parsed_summary, ensure_ascii=False),
-            "sources": json.loads(row["sources"]),
+            "sources": _safe_json(row["sources"]),
             "updated_at": row["created_at"],
         }
 
         # Also expose normalized fields directly for newer clients.
         payload["items"] = parsed_summary.get("items", [])
         payload["insight"] = parsed_summary.get("insight", "")
+        payload["dialogue"] = _safe_json(row.get("dialogue"), fallback=[])
 
         self._json_response(200, payload)
 

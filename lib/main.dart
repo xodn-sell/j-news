@@ -2,31 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/notification_service.dart';
+import 'services/native_ad_service.dart';
+import 'services/auth_service.dart';
+import 'theme/jnews_colors.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
+  final bootStart = DateTime.now();
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 상태바 스타일
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
   ));
 
+  await Firebase.initializeApp();
+  final analytics = FirebaseAnalytics.instance;
+  analytics.logAppOpen();
+
+  await AuthService.init();
+
+  // 로그인된 유저면 GA userId / user_property 세팅
+  final uid = AuthService.uid;
+  if (uid != null) {
+    await analytics.setUserId(id: uid);
+    await analytics.setUserProperty(name: 'signed_in', value: 'true');
+  } else {
+    await analytics.setUserProperty(name: 'signed_in', value: 'false');
+  }
+
   await MobileAds.instance.initialize();
+  NativeAdService.preload();
 
   try {
     await NotificationService.init(
       onNotificationTap: (payload) {
+        analytics.logEvent(name: 'notification_tapped', parameters: {
+          'payload': (payload ?? '').length > 80
+              ? payload!.substring(0, 80)
+              : (payload ?? ''),
+        });
         if (navigatorKey.currentState != null) {
           navigatorKey.currentState!.pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => HomeScreen(initialRegion: payload),
-            ),
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
             (route) => false,
           );
         }
@@ -35,23 +62,74 @@ void main() async {
     await NotificationService.scheduleDailyNews();
   } catch (e) {
     debugPrint('[J-news] 알림 초기화 실패: $e');
+    analytics.logEvent(name: 'notification_init_fail', parameters: {
+      'error': e.toString().length > 100 ? e.toString().substring(0, 100) : e.toString(),
+    });
   }
 
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  final themeModeStr = prefs.getString('theme_mode') ?? 'light';
+  final isSignedIn = AuthService.isSignedIn;
+
+  // uid-scoped onboarding flag + legacy migration
+  bool onboardingDone = false;
+  if (isSignedIn && uid != null) {
+    onboardingDone = prefs.getBool('onboarding_done_$uid') ?? false;
+
+    // 레거시 마이그레이션: 이전 앱 버전에서 디바이스 단위 저장된 플래그를
+    // 현재 uid로 한 번만 승격. 이후 uninstall/reinstall 시에도 유지.
+    final legacy = prefs.getBool('onboarding_done') ?? false;
+    if (legacy && !prefs.containsKey('onboarding_done_$uid')) {
+      await prefs.setBool('onboarding_done_$uid', true);
+      onboardingDone = true;
+    }
+  }
+
+  themeModeNotifier.value = _parseThemeMode(themeModeStr);
+
+  final bootDurationMs = DateTime.now().difference(bootStart).inMilliseconds;
+  analytics.logEvent(name: 'app_boot', parameters: {
+    'duration_ms': bootDurationMs,
+    'signed_in': isSignedIn ? 1 : 0,
+    'onboarding_done': onboardingDone ? 1 : 0,
+  });
+
+  runApp(MyApp(
+    showOnboarding: !onboardingDone,
+    isSignedIn: isSignedIn,
+  ));
+}
+
+// 앱 전체에서 테마 변경을 위한 notifier
+final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+
+ThemeMode _parseThemeMode(String s) {
+  if (s == 'light') return ThemeMode.light;
+  if (s == 'dark') return ThemeMode.dark;
+  return ThemeMode.system;
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool showOnboarding;
+  final bool isSignedIn;
+  const MyApp({
+    super.key,
+    this.showOnboarding = false,
+    this.isSignedIn = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final baseTextTheme = GoogleFonts.notoSansTextTheme();
 
-    return MaterialApp(
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, themeMode, _) => MaterialApp(
       navigatorKey: navigatorKey,
       title: 'J-news',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        extensions: const [JNewsColors.light],
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF003366),
           brightness: Brightness.light,
@@ -96,6 +174,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       darkTheme: ThemeData(
+        extensions: const [JNewsColors.dark],
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1B2838),
           brightness: Brightness.dark,
@@ -138,8 +217,12 @@ class MyApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
-      themeMode: ThemeMode.system,
-      home: const HomeScreen(),
-    );
+      themeMode: themeMode,
+      home: !isSignedIn
+          ? const LoginScreen()
+          : showOnboarding
+              ? const OnboardingScreen()
+              : const HomeScreen(),
+    ));
   }
 }

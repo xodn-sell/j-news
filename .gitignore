@@ -62,3 +62,18 @@ __pycache__/
 # Backend build artifacts
 backend/.vercel
 backend/nul
+
+# Local-only artifacts
+.gradle-local/
+.pipe*
+_tmp_guide.pdf
+/screen*.png
+.claude/settings.local.json
+
+# Secrets (public repo)
+android/app/google-services.json
+
+# Toss miniapp build
+toss-miniapp/node_modules/
+toss-miniapp/dist/
+toss-miniapp/*.ait

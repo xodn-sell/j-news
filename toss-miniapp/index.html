@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>J-NEWS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ── HEADER ──────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <span class="brand-name">J-NEWS</span>
+      <span class="brand-dot"></span>
+      <span class="brand-date" id="today-date"></span>
+    </div>
+
+    <div class="progress-dots" id="progress-dots"></div>
+
+    <div class="header-right">
+      <div class="card-counter" id="card-counter">
+        <span id="counter-cur">1</span>/<span id="counter-total">6</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── CARD STAGE ───────────────────────────────────────────── -->
+  <main class="card-stage" id="card-stage">
+
+    <!-- 로딩 스켈레톤 -->
+    <div class="skeleton-wrap" id="skeleton">
+      <div class="skel-badge"></div>
+      <div class="skel-gap"></div>
+      <div class="skel-line w-80"></div>
+      <div class="skel-line w-100"></div>
+      <div class="skel-line w-60"></div>
+      <div class="skel-gap"></div>
+      <div class="skel-line h-14 w-100"></div>
+      <div class="skel-line h-14 w-100"></div>
+      <div class="skel-line h-14 w-80"></div>
+      <div class="skel-line h-14 w-100"></div>
+      <div class="skel-line h-14 w-60"></div>
+      <div class="skel-source"></div>
+    </div>
+
+    <!-- 에러 -->
+    <div class="error-wrap hidden" id="error-view">
+      <div class="error-icon">📡</div>
+      <p class="error-msg">뉴스를 불러오지 못했어요</p>
+      <p class="error-sub">인터넷 연결을 확인하고<br>다시 시도해주세요</p>
+      <button class="retry-btn" id="retry-btn">다시 시도</button>
+    </div>
+
+    <!-- 카드 스택 (JS가 채움) -->
+    <div class="card-stack hidden" id="card-stack"></div>
+
+    <!-- 완독 화면 -->
+    <div class="complete-screen" id="complete-screen">
+      <div class="complete-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <p class="complete-title">오늘 브리핑 완독!</p>
+      <p class="complete-sub">오늘의 주요 뉴스를<br>모두 확인했어요</p>
+
+      <!-- 앱 다운로드 유도 카드 -->
+      <div class="app-promo">
+        <div class="app-promo-icon">🎁</div>
+        <div class="app-promo-text">
+          <p class="app-promo-title">앱에서 포인트 받기</p>
+          <p class="app-promo-sub">완독하면 뽑기로 포인트 적립<br>1,000P = 편의점 기프티콘</p>
+        </div>
+      </div>
+
+      <p class="complete-next">매일 오전 7시 · 오후 6시 업데이트</p>
+
+      <!-- 처음으로 버튼 -->
+      <button class="restart-btn" id="restart-btn">처음으로</button>
+    </div>
+
+  </main>
+
+  <!-- ── BANNER AD BAR ────────────────────────────────────────── -->
+  <div class="banner-ad-bar" id="banner-ad-bar">
+    <div id="banner-ad"></div>
+  </div>
+
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -44,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
         category = params.get("category", [None])[0]
 
         try:
-            if region and region not in ("us", "kr"):
+            if region and region not in ("us", "kr", "world"):
                 raise ValueError("Invalid region")
             if category and category not in VALID_CATEGORIES:
                 raise ValueError("Invalid category")
@@ -58,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
                     fetch_and_store(region, cat)
             else:
                 # 전체 갱신
-                for r in ["us", "kr"]:
+                for r in ["us", "kr", "world"]:
                     for cat in VALID_CATEGORIES:
                         fetch_and_store(r, cat)
 

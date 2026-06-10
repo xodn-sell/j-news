@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/news_result.dart';
 
 class ApiService {
-  static const String _baseUrl = 'https://backend-ruby-chi-85.vercel.app';
+  static const String baseUrl = 'https://backend-ruby-chi-85.vercel.app';
+  static const String _baseUrl = baseUrl;
   static const Duration _timeout = Duration(seconds: 15);
 
   static Future<NewsResult> getNewsSummary(String region, {String category = 'general'}) async {

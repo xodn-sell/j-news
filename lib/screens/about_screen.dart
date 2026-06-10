@@ -11,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
 
-  static const String _appVersion = '1.1.2';
+  static const String _appVersion = '1.3.0';
   static const String _contactEmail = 'xowns142857@gmail.com';
   static const String _developerName = 'k-jieum';
   static const String _privacyUrl = 'https://backend-ruby-chi-85.vercel.app/privacy';
@@ -118,7 +118,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('앱 정보'),
+        title: const Text('App Info & Contact / 앱 정보 및 문의'),
         backgroundColor: theme.colorScheme.surface,
       ),
       body: ListView(
@@ -128,22 +128,12 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
           Center(
             child: Column(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1a2744),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'J',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/app_icon.png',
+                    width: 80,
+                    height: 80,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -252,12 +242,12 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
           _buildSection(
             theme: theme,
             isDark: isDark,
-            title: '문의하기',
+            title: 'Contact Us / 문의하기',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '앱 관련 문의, 피드백, 버그 리포트 등은 '
+                  '앱 이용 중 문의사항, 피드백, 뉴스 콘텐츠 관련 제보 등은 '
                   '아래 이메일로 연락해 주세요.',
                   style: TextStyle(
                     fontSize: 14,
@@ -266,11 +256,11 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // 개발자
+                // 운영자
                 _buildInfoRow(
                   theme: theme,
                   icon: Icons.person_outline,
-                  label: '개발자',
+                  label: '운영자 (Operator)',
                   value: _developerName,
                 ),
                 const SizedBox(height: 12),
@@ -281,7 +271,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                   child: _buildInfoRow(
                     theme: theme,
                     icon: Icons.email_outlined,
-                    label: '이메일',
+                    label: '이메일 (Customer Support)',
                     value: _contactEmail,
                     isLink: true,
                   ),

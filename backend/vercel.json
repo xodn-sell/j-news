@@ -1,19 +1,23 @@
 {
   "builds": [
-    { "src": "api/*.py", "use": "@vercel/python" }
+    { "src": "api/*.py", "use": "@vercel/python" },
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "admin.html", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/contact", "dest": "/api/contact.py" },
     { "src": "/api/news", "dest": "/api/news.py" },
-    { "src": "/api/cron", "dest": "/api/cron.py" }
+    { "src": "/api/cron", "dest": "/api/cron.py" },
+{ "src": "/api/admin", "dest": "/api/admin.py" },
+    { "src": "/api/chat", "dest": "/api/chat.py" },
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/icon.png", "dest": "/public/icon.png" },
+    { "src": "/app-ads.txt", "dest": "/public/app-ads.txt" },
+    { "src": "/", "dest": "/public/index.html" }
   ],
   "crons": [
-    { "path": "/api/cron?region=us&category=general", "schedule": "0 23 * * 1-5" },
-    { "path": "/api/cron?region=us&category=tech", "schedule": "1 23 * * 1-5" },
-    { "path": "/api/cron?region=us&category=economy", "schedule": "2 23 * * 1-5" },
-    { "path": "/api/cron?region=us&category=entertainment", "schedule": "3 23 * * 1-5" },
-    { "path": "/api/cron?region=kr&category=general", "schedule": "0 9 * * 1-5" },
-    { "path": "/api/cron?region=kr&category=tech", "schedule": "1 9 * * 1-5" },
-    { "path": "/api/cron?region=kr&category=economy", "schedule": "2 9 * * 1-5" },
-    { "path": "/api/cron?region=kr&category=entertainment", "schedule": "3 9 * * 1-5" }
+    { "path": "/api/cron?region=world&category=general", "schedule": "0 22 * * *" },
+    { "path": "/api/cron?region=world&category=general", "schedule": "0 3 * * *" },
+    { "path": "/api/cron?region=world&category=general", "schedule": "0 9 * * *" }
   ]
 }
