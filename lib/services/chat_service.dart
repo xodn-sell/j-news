@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_service.dart';
+import 'auth_service.dart';
+
+/// 일일 사용량 한도 초과 (HTTP 429 + error: daily_limit)
+class ChatDailyLimitException implements Exception {
+  final String message;
+  const ChatDailyLimitException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class ChatMessage {
   final String role; // 'user' or 'assistant'
@@ -29,7 +39,9 @@ class ChatService {
     required List<ChatMessage> history,
     required String message,
   }) async {
+    final uid = AuthService.uid;
     final body = jsonEncode({
+      if (uid != null) 'uid': uid,
       if (newsContext != null) 'news_context': newsContext,
       'history': history.map((m) => m.toApiJson()).toList(),
       'message': message,
@@ -58,6 +70,19 @@ class ChatService {
         throw Exception('AI 응답을 처리하지 못했어.');
       }
     } else if (response.statusCode == 429) {
+      // 일일 한도 초과(daily_limit) vs 분당 rate limit 구분
+      try {
+        final error = jsonDecode(utf8.decode(response.bodyBytes));
+        if (error['error'] == 'daily_limit') {
+          throw ChatDailyLimitException(
+            (error['message'] ?? '오늘 AI 튜터 사용량을 다 썼어요. 내일 다시 만나요!').toString(),
+          );
+        }
+      } on ChatDailyLimitException {
+        rethrow;
+      } catch (_) {
+        // JSON 파싱 실패 → 일반 rate limit 처리
+      }
       throw Exception('잠시 후 다시 시도해줘. (요청이 너무 많아)');
     } else {
       try {

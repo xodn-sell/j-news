@@ -4,7 +4,9 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'news_tab.dart';
 import 'settings_screen.dart';
 import 'bookmark_screen.dart';
+import 'review_screen.dart';
 import '../services/news_session.dart';
+import '../services/review_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   int _currentPage = 0;
   int _totalPages = 0;
+  int _reviewDueCount = 0; // 오늘 복습할 SRS 카드 수 (헤더 배지)
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
@@ -45,6 +48,14 @@ class _HomeScreenState extends State<HomeScreen>
     _countdownTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
+
+    _refreshReviewDue();
+  }
+
+  /// 오늘 due 카드 수 갱신 (헤더 배지).
+  Future<void> _refreshReviewDue() async {
+    final stats = await ReviewService.stats();
+    if (mounted) setState(() => _reviewDueCount = stats.dueToday);
   }
 
   @override
@@ -70,6 +81,13 @@ class _HomeScreenState extends State<HomeScreen>
   void _openBookmarks() {
     FirebaseAnalytics.instance.logEvent(name: 'bookmarks_opened');
     Navigator.push(context, MaterialPageRoute(builder: (_) => const BookmarkScreen()));
+  }
+
+  Future<void> _openReview() async {
+    FirebaseAnalytics.instance.logEvent(name: 'review_opened');
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const ReviewScreen()));
+    _refreshReviewDue(); // 복습 후 배지 갱신
   }
 
   @override
@@ -148,6 +166,8 @@ class _HomeScreenState extends State<HomeScreen>
                           right: 12,
                           child: Row(
                             children: [
+                              _HeaderIconButton(icon: Icons.style_rounded, onTap: _openReview, theme: theme, badgeCount: _reviewDueCount),
+                              const SizedBox(width: 6),
                               _HeaderIconButton(icon: Icons.bookmark_outline_rounded, onTap: _openBookmarks, theme: theme),
                               const SizedBox(width: 6),
                               _HeaderIconButton(icon: Icons.tune_rounded, onTap: _openSettings, theme: theme),
@@ -277,8 +297,9 @@ class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final ThemeData theme;
+  final int badgeCount; // 0이면 배지 숨김 (복습 due 카운트)
 
-  const _HeaderIconButton({required this.icon, required this.onTap, required this.theme});
+  const _HeaderIconButton({required this.icon, required this.onTap, required this.theme, this.badgeCount = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +314,36 @@ class _HeaderIconButton extends StatelessWidget {
             color: const Color(0xFF0D1117).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+              // due 카운트 배지 (state 컬러 — error)
+              if (badgeCount > 0)
+                Positioned(
+                  top: 3, right: 3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    constraints: const BoxConstraints(minWidth: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF3B30),
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

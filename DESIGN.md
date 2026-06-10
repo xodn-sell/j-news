@@ -254,6 +254,42 @@ components:
     paddingY: 2
     weight: 800
 
+  # SRS 복습 플래시카드 (review_screen) — Editorial 톤
+  reviewFlashCard:
+    radius: 24                  # radius.xl
+    padding: 24
+    bgLight: surfaceElevated    # #FFFFFF
+    bgDark: surfaceContainerHighest
+    borderLight: "1px solid rgba(0, 82, 204, 0.08)"
+    borderDark: "none"
+    frontQuestionSize: 18       # w800, height 1.5, ls -0.4, 중앙 정렬
+    frontHint: "탭해서 정답 확인 — 12px w500 textPrimary 35%"
+    backAnswerSize: 17          # w800 + success 체크 아이콘 (state 컬러 예외)
+    backExplanationSize: 14     # w500, height 1.65, textPrimary 70%
+    flip: "200ms easeInOut fade (3D 회전·elasticOut 금지)"
+    actions: "다시 볼래요(outlined 52h) / 기억났어요(filled accent 52h)"
+
+  # 출처 기사 칩 (review_screen 카드 상단)
+  dueDateChip:
+    radius: 8                   # radius.sm
+    paddingX: 8
+    paddingY: 3
+    bg: "rgba(0, 82, 204, 0.08)"   # accent 8%
+    fg: accent
+    fontSize: 11
+    fontWeight: 800
+    maxLines: 1                 # ellipsis
+
+  # 헤더 due 배지 (home_screen _HeaderIconButton)
+  dueBadge:
+    bg: error                   # #FF3B30 — state 컬러 (재방문 트리거)
+    fg: "#FFFFFF"
+    radius: full
+    minWidth: 14
+    fontSize: 9
+    fontWeight: 800
+    maxLabel: "9+"
+
 # ── 모션 ──────────────────────────────────────────
 motion:
   fadeEntry:
@@ -437,6 +473,7 @@ accessibility:
 
 ## 11. 변경 이력
 
+- **2026-06-10 v1.2.1** — 학습앱 전환 P2: SRS 복습 컴포넌트 3종 추가 (reviewFlashCard, dueDateChip, dueBadge). 복습 화면은 Editorial 단일 톤 (컨페티/elasticOut 금지, 200ms fade).
 - **2026-05-08 v1.2.0** — 톤 전략 (Editorial Base + Gamified Rewards) 섹션 8 추가. 두 톤 명확 분리. 카드/홈/온보딩=editorial, gacha_dialog/완독토스트=gamified.
 - **2026-04-25 v1.1.0** — 실측 기반 재작성. 192개 하드코딩 분석 → brand accent(`#0052CC`) 추가, text/surface 보정, state 컬러 정의, 컴포넌트 8종 추가, Tech Debt 인벤토리 추가.
 - **2026-04-22 v1.0.0** — 초기 스펙. main.dart ThemeData 미러.

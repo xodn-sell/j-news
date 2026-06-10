@@ -50,6 +50,7 @@ class _ChatSheetState extends State<ChatSheet> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  bool _limitReached = false; // 일일 한도 초과 — 입력 비활성화
 
   // 제안 질문들 — 사용자가 처음 진입했을 때 빠른 시작용
   static const List<String> _starterQuestions = [
@@ -75,7 +76,7 @@ class _ChatSheetState extends State<ChatSheet> {
 
   Future<void> _send(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isSending) return;
+    if (trimmed.isEmpty || _isSending || _limitReached) return;
 
     setState(() {
       _messages.add(ChatMessage(role: 'user', content: trimmed, ts: DateTime.now()));
@@ -111,6 +112,21 @@ class _ChatSheetState extends State<ChatSheet> {
         _isSending = false;
       });
       _scrollToBottom();
+    } on ChatDailyLimitException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(
+          role: 'assistant',
+          content: e.message,
+          ts: DateTime.now(),
+        ));
+        _isSending = false;
+        _limitReached = true;
+      });
+      _scrollToBottom();
+      FirebaseAnalytics.instance.logEvent(name: 'chat_daily_limit', parameters: {
+        'turn': _messages.length,
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -222,6 +238,7 @@ class _ChatSheetState extends State<ChatSheet> {
                         final msg = _messages[i];
                         // 가장 최근 assistant 메시지에만 후속 칩 노출 (전송 중엔 숨김)
                         final isLastAssistant = !_isSending &&
+                            !_limitReached &&
                             msg.role == 'assistant' &&
                             i == _messages.length - 1;
                         return Column(
@@ -254,25 +271,28 @@ class _ChatSheetState extends State<ChatSheet> {
                       ),
                       child: TextField(
                         controller: _controller,
+                        enabled: !_limitReached,
                         minLines: 1,
                         maxLines: 4,
                         textInputAction: TextInputAction.send,
                         onSubmitted: _send,
-                        decoration: const InputDecoration(
-                          hintText: '뉴스에 대해 뭐든 물어봐',
+                        decoration: InputDecoration(
+                          hintText: _limitReached ? '오늘 사용량을 다 썼어요' : '뉴스에 대해 뭐든 물어봐',
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Material(
-                    color: const Color(0xFF0052CC),
+                    color: _limitReached
+                        ? const Color(0xFF0052CC).withValues(alpha: 0.35)
+                        : const Color(0xFF0052CC),
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: _isSending ? null : () => _send(_controller.text),
+                      onTap: (_isSending || _limitReached) ? null : () => _send(_controller.text),
                       child: SizedBox(
                         width: 44, height: 44,
                         child: _isSending

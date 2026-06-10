@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart' as share_plus;
 import '../models/news_result.dart';
 import '../services/quiz_service.dart';
+import '../services/review_service.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 // ── 디자인 토큰 (DESIGN.md 준수) ─────────────────────────────
@@ -29,6 +30,9 @@ enum _QuizPhase { intro, question, result }
 
 class QuizScreen extends StatefulWidget {
   final List<QuizQuestion> questions;
+
+  /// questions와 같은 길이의 출처 기사 제목 (복습 카드 등록용).
+  final List<String> articleTitles;
   final int newsCount;
   final int glossaryCount;
   final int streakCount;
@@ -36,6 +40,7 @@ class QuizScreen extends StatefulWidget {
   const QuizScreen({
     super.key,
     required this.questions,
+    this.articleTitles = const [],
     required this.newsCount,
     required this.glossaryCount,
     required this.streakCount,
@@ -94,11 +99,17 @@ class _QuizScreenState extends State<QuizScreen>
     setState(() => _revealed = true);
     _feedbackController.forward(from: 0.0);
 
+    // 출처 기사 제목 (articleTitles 미전달 시 빈 문자열)
+    final articleTitle = _qIndex < widget.articleTitles.length
+        ? widget.articleTitles[_qIndex]
+        : '';
     await QuizService.recordAttempt(
       question: q.question,
-      articleTitle: widget.questions[_qIndex].question,
+      articleTitle: articleTitle,
       correct: isCorrect,
     );
+    // 푼 문제를 SRS 복습 카드로 등록 (stage 1 → 내일 due)
+    await ReviewService.addCard(q, articleTitle);
     _analytics.logEvent(name: 'quiz_attempted', parameters: {
       'question_index': _qIndex,
       'correct': isCorrect,

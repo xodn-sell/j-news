@@ -789,8 +789,8 @@ class _NewsTabState extends State<NewsTab>
 
           // 퀴즈 CTA — 문항이 있을 때만 표시 (메인 강조)
           Builder(builder: (ctx) {
-            final questions = QuizService.buildSessionQuiz(_result?.items ?? []);
-            if (questions.isEmpty) return const SizedBox.shrink();
+            final sessionQuiz = QuizService.buildSessionQuiz(_result?.items ?? []);
+            if (sessionQuiz.isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: SizedBox(
@@ -798,14 +798,17 @@ class _NewsTabState extends State<NewsTab>
                 child: FilledButton.icon(
                   onPressed: () {
                     _analytics.logEvent(name: 'quiz_started', parameters: {
-                      'question_count': questions.length,
+                      'question_count': sessionQuiz.length,
                     });
                     final items = _result?.items ?? [];
                     final glossaryCount = items.fold<int>(
                         0, (sum, i) => sum + i.glossary.length);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => QuizScreen(
-                        questions: questions,
+                        questions:
+                            sessionQuiz.map((e) => e.question).toList(),
+                        articleTitles:
+                            sessionQuiz.map((e) => e.articleTitle).toList(),
                         newsCount: items.length,
                         glossaryCount: glossaryCount,
                         streakCount: _streakCount,

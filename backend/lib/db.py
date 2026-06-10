@@ -55,6 +55,52 @@ def init_db():
         conn.close()
 
 
+def init_chat_db():
+    """chat_usage 테이블 생성 (일일 AI 채팅 사용량 추적)."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chat_usage (
+                user_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, date)
+            )
+        """)
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
+def increment_chat_usage(user_id: str) -> int:
+    """KST 오늘 날짜 기준 사용량 +1 후 누적 count 반환.
+
+    INSERT ... ON CONFLICT DO UPDATE (원자적 UPSERT) — 동시 요청에도 안전.
+    """
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO chat_usage (user_id, date, count)
+            VALUES (%s, %s, 1)
+            ON CONFLICT (user_id, date)
+            DO UPDATE SET count = chat_usage.count + 1
+            RETURNING count
+            """,
+            (user_id, today),
+        )
+        count = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return count
+    finally:
+        conn.close()
+
+
 def save_news(region: str, category: str, summary: str, sources: str, dialogue: str | None = None):
     conn = get_conn()
     try:

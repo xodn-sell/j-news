@@ -8,9 +8,12 @@ from http.server import BaseHTTPRequestHandler
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from google import genai
 from google.genai import types
+from lib.db import init_chat_db, increment_chat_usage
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+DAILY_LIMIT = 30  # 유저당 하루 최대 채팅 횟수 (KST 날짜 기준)
 
 RATE_LIMIT = 30
 RATE_WINDOW = 60
@@ -107,6 +110,35 @@ class handler(BaseHTTPRequestHandler):
             self._json_response(400, {"detail": f"message too long (max {MAX_MESSAGE_LEN})"})
             return
 
+        # 일일 사용량 제한 — Gemini 호출 전에 카운트 (실패 시 환불 없음, 단순 유지)
+        uid = (body.get("uid") or "").strip()
+        if uid:
+            user_id = uid
+        else:
+            # 식별자 없으면 IP 기반 fallback
+            forwarded = self.headers.get("X-Forwarded-For", "")
+            client_ip = forwarded.split(",")[0].strip() if forwarded else self.client_address[0]
+            user_id = f"ip:{client_ip}"
+
+        used = None
+        try:
+            init_chat_db()
+            used = increment_chat_usage(user_id)
+        except Exception:
+            # DB 장애 시 채팅 자체는 허용 (fail-open)
+            used = None
+
+        if used is not None and used > DAILY_LIMIT:
+            self._json_response(
+                429,
+                {
+                    "error": "daily_limit",
+                    "message": "오늘 AI 튜터 사용량을 다 썼어요. 내일 다시 만나요!",
+                    "limit": DAILY_LIMIT,
+                },
+            )
+            return
+
         news_context = body.get("news_context") or {}
         history = body.get("history") or []
         if not isinstance(history, list):
@@ -182,4 +214,7 @@ class handler(BaseHTTPRequestHandler):
             self._json_response(500, {"detail": f"AI 응답 실패: {str(e)[:120]}"})
             return
 
-        self._json_response(200, {"reply": reply})
+        payload = {"reply": reply}
+        if used is not None:
+            payload["remaining"] = max(0, DAILY_LIMIT - used)
+        self._json_response(200, payload)
