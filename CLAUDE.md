@@ -137,7 +137,7 @@ toss-miniapp/
 - 라이트 모드 전용, 핀치줌 비활성화 (`user-scalable=no`) 유지
 
 ## 현재 버전
-- Flutter 앱: `1.6.0+24` — **pubspec.yaml 1곳만 수정** (앱 내 버전 표기는 `package_info_plus` 런타임 조회, 하드코딩 제거됨 v1.6.x)
+- Flutter 앱: `1.7.0+25` — **pubspec.yaml 1곳만 수정** (앱 내 버전 표기는 `package_info_plus` 런타임 조회, 하드코딩 제거됨 v1.6.x)
 
 ## 광고 구성 (v1.3.0+)
 - **네이티브 광고 풀카드** (Android 커스텀 `NativeAdFactory` 구현)
