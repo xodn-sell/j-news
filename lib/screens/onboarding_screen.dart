@@ -3,6 +3,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
+import '../theme/jnews_colors.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -111,8 +112,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     final viewPadding = MediaQuery.of(context).viewPadding;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.jColors;
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: isDark ? c.surfaceBase : c.surfaceAlt,
       body: Stack(
         children: [
           // 배경 블롭 (safe area 무시, 시스템 바까지 뻗음)
@@ -124,7 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF0052CC).withValues(alpha: 0.08),
+                color: c.accent.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -136,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFFFC107).withValues(alpha: 0.10),
+                color: c.warning.withValues(alpha: 0.10),
               ),
             ),
           ),
@@ -186,13 +189,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Text(
+                            Text(
                               'J-NEWS',
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: -0.8,
-                                color: Color(0xFF0D1117),
+                                color: c.textPrimary,
                               ),
                             ),
                           ],
@@ -207,16 +210,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0052CC)
-                                .withValues(alpha: 0.10),
+                            color: c.accent.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
+                          child: Text(
                             '🌱  하루 1분 세계 뉴스',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF0052CC),
+                              color: c.accent,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -225,14 +227,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         const SizedBox(height: 14),
 
                         // 헤드라인
-                        const Text(
+                        Text(
                           '하루 1분,\n세상을 읽다',
                           style: TextStyle(
                             fontSize: 32,
                             height: 1.15,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -1.2,
-                            color: Color(0xFF0D1117),
+                            color: c.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -241,8 +243,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           style: TextStyle(
                             fontSize: 15,
                             height: 1.5,
-                            color: const Color(0xFF0D1117)
-                                .withValues(alpha: 0.55),
+                            color: c.textPrimary.withValues(alpha: 0.55),
                           ),
                         ),
 
@@ -278,7 +279,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         Container(
                           height: 1,
                           margin: const EdgeInsets.only(bottom: 12),
-                          color: const Color(0xFF0D1117).withValues(alpha: 0.06),
+                          color: c.textPrimary.withValues(alpha: 0.06),
                         ),
 
                         // 알림 opt-in (하단 블록)
@@ -295,16 +296,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                             decoration: BoxDecoration(
                               color: _notificationOptIn
-                                  ? const Color(0xFF0052CC)
-                                      .withValues(alpha: 0.06)
+                                  ? c.accent.withValues(alpha: 0.06)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: _notificationOptIn
-                                    ? const Color(0xFF0052CC)
-                                        .withValues(alpha: 0.25)
-                                    : const Color(0xFF0D1117)
-                                        .withValues(alpha: 0.08),
+                                    ? c.accent.withValues(alpha: 0.25)
+                                    : c.textPrimary.withValues(alpha: 0.08),
                                 width: 1,
                               ),
                             ),
@@ -316,9 +314,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                       : Icons.radio_button_unchecked_rounded,
                                   size: 22,
                                   color: _notificationOptIn
-                                      ? const Color(0xFF0052CC)
-                                      : const Color(0xFF0D1117)
-                                          .withValues(alpha: 0.3),
+                                      ? c.accent
+                                      : c.textPrimary.withValues(alpha: 0.3),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -334,8 +331,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                             style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w800,
-                                              color: const Color(0xFF0D1117)
-                                                  .withValues(alpha: 0.88),
+                                              color: c.textPrimary.withValues(alpha: 0.88),
                                               letterSpacing: -0.2,
                                             ),
                                           ),
@@ -346,8 +342,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                         '07:00 / 18:00 · 새 브리핑 알림',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: const Color(0xFF0D1117)
-                                              .withValues(alpha: 0.5),
+                                          color: c.textPrimary.withValues(alpha: 0.5),
                                         ),
                                       ),
                                     ],
@@ -363,12 +358,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         // CTA
                         Center(
                           child: _isFinishing
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 28,
                                   height: 28,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    color: Color(0xFF0052CC),
+                                    color: c.accent,
                                   ),
                                 )
                               : AnimatedBuilder(
@@ -381,25 +376,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                         vertical: 14,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0052CC),
+                                        color: c.accent,
                                         borderRadius: BorderRadius.circular(999),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFF0052CC)
-                                                .withValues(
-                                                  alpha: 0.25 + 0.15 * t,
-                                                ),
+                                            color: c.accent.withValues(
+                                              alpha: 0.25 + 0.15 * t,
+                                            ),
                                             blurRadius: 20 + 8 * t,
                                             offset: const Offset(0, 6),
                                           ),
                                         ],
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         '👆  화면을 탭해서 시작',
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w900,
-                                          color: Colors.white,
+                                          color: c.textInverse,
                                           letterSpacing: -0.2,
                                         ),
                                       ),
@@ -415,8 +409,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             '시작하면 개인정보처리방침 및 이용약관에 동의합니다',
                             style: TextStyle(
                               fontSize: 10.5,
-                              color: const Color(0xFF0D1117)
-                                  .withValues(alpha: 0.32),
+                              color: c.textPrimary.withValues(alpha: 0.32),
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -436,17 +429,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildStep(int n, String emoji, String title, String subtitle) {
+    final c = context.jColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        // 다크 대응 — 카드 배경
+        color: isDark ? c.surfaceCard : c.surfaceElevated,
+        borderRadius: BorderRadius.circular(16), // radius.md (14→16)
         border: Border.all(
-          color: const Color(0xFF0D1117).withValues(alpha: 0.06),
+          color: c.textPrimary.withValues(alpha: 0.06),
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0D1117).withValues(alpha: 0.03),
+            color: c.textPrimary.withValues(alpha: isDark ? 0.0 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -459,15 +455,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              // 그라디언트 끝색 #2E7BFF → accentLight (#4D9EFF)
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF0052CC), Color(0xFF2E7BFF)],
+                colors: [c.accent, c.accentLight],
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0052CC).withValues(alpha: 0.25),
+                  color: c.accent.withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -476,10 +473,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: Center(
               child: Text(
                 '$n',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: c.textInverse,
                 ),
               ),
             ),
@@ -497,10 +494,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     Flexible(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0D1117),
+                          color: c.textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
@@ -512,7 +509,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: const Color(0xFF0D1117).withValues(alpha: 0.5),
+                    color: c.textPrimary.withValues(alpha: 0.5),
                   ),
                 ),
               ],

@@ -29,7 +29,8 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
 
   // Surface
   final Color surfaceBase;        // #FBFBFE
-  final Color surfaceElevated;    // #FFFFFF
+  final Color surfaceElevated;    // #FFFFFF (light) / #252830 (dark)
+  final Color surfaceCard;        // #FFFFFF (light) / #1C2128 (dark) — 뉴스 카드 메인
   final Color surfaceAlt;         // #F5F6FA
   final Color surfaceTint;        // #EEF4FF
   final Color surfaceTintDeep;    // #E8F0FF
@@ -56,6 +57,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
     required this.textInverse,
     required this.surfaceBase,
     required this.surfaceElevated,
+    required this.surfaceCard,
     required this.surfaceAlt,
     required this.surfaceTint,
     required this.surfaceTintDeep,
@@ -80,6 +82,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
     textInverse: Color(0xFFFFFFFF),
     surfaceBase: Color(0xFFFBFBFE),
     surfaceElevated: Color(0xFFFFFFFF),
+    surfaceCard: Color(0xFFFFFFFF),
     surfaceAlt: Color(0xFFF5F6FA),
     surfaceTint: Color(0xFFEEF4FF),
     surfaceTintDeep: Color(0xFFE8F0FF),
@@ -104,6 +107,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
     textInverse: Color(0xFF0F1115),
     surfaceBase: Color(0xFF0F1115),
     surfaceElevated: Color(0xFF252830),
+    surfaceCard: Color(0xFF1C2128),
     surfaceAlt: Color(0xFF1C2128),
     surfaceTint: Color(0xFF1C1F26),
     surfaceTintDeep: Color(0xFF0F1115),
@@ -128,6 +132,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
     Color? textInverse,
     Color? surfaceBase,
     Color? surfaceElevated,
+    Color? surfaceCard,
     Color? surfaceAlt,
     Color? surfaceTint,
     Color? surfaceTintDeep,
@@ -150,6 +155,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
       textInverse: textInverse ?? this.textInverse,
       surfaceBase: surfaceBase ?? this.surfaceBase,
       surfaceElevated: surfaceElevated ?? this.surfaceElevated,
+      surfaceCard: surfaceCard ?? this.surfaceCard,
       surfaceAlt: surfaceAlt ?? this.surfaceAlt,
       surfaceTint: surfaceTint ?? this.surfaceTint,
       surfaceTintDeep: surfaceTintDeep ?? this.surfaceTintDeep,
@@ -177,6 +183,7 @@ class JNewsColors extends ThemeExtension<JNewsColors> {
       textInverse: Color.lerp(textInverse, other.textInverse, t)!,
       surfaceBase: Color.lerp(surfaceBase, other.surfaceBase, t)!,
       surfaceElevated: Color.lerp(surfaceElevated, other.surfaceElevated, t)!,
+      surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t)!,
       surfaceAlt: Color.lerp(surfaceAlt, other.surfaceAlt, t)!,
       surfaceTint: Color.lerp(surfaceTint, other.surfaceTint, t)!,
       surfaceTintDeep: Color.lerp(surfaceTintDeep, other.surfaceTintDeep, t)!,

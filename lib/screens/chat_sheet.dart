@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../services/chat_service.dart';
 import '../models/news_result.dart';
+import '../theme/jnews_colors.dart';
 
 class ChatSheet extends StatefulWidget {
   final String newsTitle;
@@ -27,16 +28,16 @@ class ChatSheet extends StatefulWidget {
     FirebaseAnalytics.instance.logEvent(name: 'chat_opened', parameters: {
       'title_len': newsTitle.length,
     });
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
-      builder: (_) => ChatSheet(
-        newsTitle: newsTitle,
-        newsBody: newsBody,
-        whyMatters: whyMatters,
-        glossary: glossary,
+    // 풀스크린 페이지 — 바텀시트(85%)는 뒷화면이 비쳐 보여 산만 (UX 피드백)
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ChatSheet(
+          newsTitle: newsTitle,
+          newsBody: newsBody,
+          whyMatters: whyMatters,
+          glossary: glossary,
+        ),
       ),
     );
   }
@@ -160,28 +161,14 @@ class _ChatSheetState extends State<ChatSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final mediaQuery = MediaQuery.of(context);
-    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final c = context.jColors;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboardHeight),
-      child: Container(
-        height: mediaQuery.size.height * 0.85,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
+    return Scaffold(
+      backgroundColor: isDark ? c.surfaceCard : c.surfaceElevated,
+      body: SafeArea(
         child: Column(
           children: [
-            // 핸들
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
-              width: 36, height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFDDDDDD),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+            const SizedBox(height: 8),
             // 헤더: AI 이름 + 뉴스 컨텍스트
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -196,7 +183,7 @@ class _ChatSheetState extends State<ChatSheet> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: const Center(
-                      child: Text('지', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                      child: Text('J', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -204,13 +191,14 @@ class _ChatSheetState extends State<ChatSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('지음 AI', style: TextStyle(
+                        // 카피 "지음 AI" → "AI 튜터" (LEARNING_PIVOT.md 통일)
+                        Text('AI 튜터', style: TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0D1117),
+                          color: c.textPrimary,
                         )),
                         Text(widget.newsTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(
                           fontSize: 12,
-                          color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.55),
+                          color: c.textMuted,
                         )),
                       ],
                     ),
@@ -222,18 +210,18 @@ class _ChatSheetState extends State<ChatSheet> {
                 ],
               ),
             ),
-            Divider(height: 1, color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.08)),
+            Divider(height: 1, color: c.borderHair),
             // 메시지 리스트
             Expanded(
               child: _messages.isEmpty
-                  ? _buildEmptyState(isDark)
+                  ? _buildEmptyState(isDark, c)
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       itemCount: _messages.length + (_isSending ? 1 : 0),
                       itemBuilder: (_, i) {
                         if (i >= _messages.length) {
-                          return _buildTypingBubble(isDark);
+                          return _buildTypingBubble(isDark, c);
                         }
                         final msg = _messages[i];
                         // 가장 최근 assistant 메시지에만 후속 칩 노출 (전송 중엔 숨김)
@@ -244,9 +232,9 @@ class _ChatSheetState extends State<ChatSheet> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildMessageBubble(msg, isDark),
+                            _buildMessageBubble(msg, isDark, c),
                             if (isLastAssistant)
-                              _buildFollowUpChips(isDark),
+                              _buildFollowUpChips(isDark, c),
                           ],
                         );
                       },
@@ -254,11 +242,11 @@ class _ChatSheetState extends State<ChatSheet> {
             ),
             // 입력바
             Container(
-              padding: EdgeInsets.fromLTRB(12, 10, 12, mediaQuery.padding.bottom + 10),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), // SafeArea가 하단 인셋 처리
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                color: isDark ? c.surfaceCard : c.surfaceElevated,
                 border: Border(
-                  top: BorderSide(color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.08)),
+                  top: BorderSide(color: c.borderHair),
                 ),
               ),
               child: Row(
@@ -266,7 +254,7 @@ class _ChatSheetState extends State<ChatSheet> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.05),
+                        color: c.borderHair,
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: TextField(
@@ -287,8 +275,8 @@ class _ChatSheetState extends State<ChatSheet> {
                   const SizedBox(width: 8),
                   Material(
                     color: _limitReached
-                        ? const Color(0xFF0052CC).withValues(alpha: 0.35)
-                        : const Color(0xFF0052CC),
+                        ? c.accent.withValues(alpha: 0.35)
+                        : c.accent,
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
@@ -313,7 +301,7 @@ class _ChatSheetState extends State<ChatSheet> {
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState(bool isDark, JNewsColors c) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
@@ -321,12 +309,12 @@ class _ChatSheetState extends State<ChatSheet> {
           const SizedBox(height: 20),
           Text('이 뉴스에 대해 같이 얘기해보자', style: TextStyle(
             fontSize: 15, fontWeight: FontWeight.w600,
-            color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.8),
+            color: c.textPrimary.withValues(alpha: 0.8),
           )),
           const SizedBox(height: 4),
           Text('아래 질문을 누르거나 직접 입력해도 돼', style: TextStyle(
             fontSize: 12,
-            color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.45),
+            color: c.textMuted,
           )),
           const SizedBox(height: 24),
           Wrap(
@@ -339,13 +327,13 @@ class _ChatSheetState extends State<ChatSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.05),
+                    color: c.borderHair,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF0052CC).withValues(alpha: 0.25)),
+                    border: Border.all(color: c.accent.withValues(alpha: 0.25)),
                   ),
                   child: Text(q, style: TextStyle(
                     fontSize: 13,
-                    color: isDark ? Colors.white : const Color(0xFF0D1117),
+                    color: c.textPrimary,
                   )),
                 ),
               );
@@ -356,7 +344,7 @@ class _ChatSheetState extends State<ChatSheet> {
     );
   }
 
-  Widget _buildFollowUpChips(bool isDark) {
+  Widget _buildFollowUpChips(bool isDark, JNewsColors c) {
     return Padding(
       padding: const EdgeInsets.only(left: 36, top: 6, bottom: 4),
       child: Wrap(
@@ -369,15 +357,15 @@ class _ChatSheetState extends State<ChatSheet> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.05),
+                color: c.borderHair,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF0052CC).withValues(alpha: 0.25)),
+                border: Border.all(color: c.accent.withValues(alpha: 0.25)),
               ),
               child: Text(
                 q,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDark ? Colors.white.withValues(alpha: 0.75) : const Color(0xFF0D1117).withValues(alpha: 0.75),
+                  color: c.textBody,
                 ),
               ),
             ),
@@ -387,7 +375,7 @@ class _ChatSheetState extends State<ChatSheet> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage msg, bool isDark) {
+  Widget _buildMessageBubble(ChatMessage msg, bool isDark, JNewsColors c) {
     final isUser = msg.isUser;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -400,11 +388,11 @@ class _ChatSheetState extends State<ChatSheet> {
               width: 28, height: 28,
               margin: const EdgeInsets.only(top: 4, right: 8),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF0052CC), Color(0xFF1E88E5)]),
+                gradient: LinearGradient(colors: [c.accent, c.accentLight]),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Center(
-                child: Text('지', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+                child: Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
               ),
             ),
           ],
@@ -413,8 +401,8 @@ class _ChatSheetState extends State<ChatSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isUser
-                    ? const Color(0xFF0052CC)
-                    : (isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFF5F6FA)),
+                    ? c.accent
+                    : (isDark ? Colors.white.withValues(alpha: 0.08) : c.surfaceAlt),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -426,7 +414,7 @@ class _ChatSheetState extends State<ChatSheet> {
                 msg.content,
                 style: TextStyle(
                   fontSize: 14, height: 1.45,
-                  color: isUser ? Colors.white : (isDark ? Colors.white : const Color(0xFF0D1117)),
+                  color: isUser ? Colors.white : c.textPrimary,
                 ),
               ),
             ),
@@ -436,7 +424,7 @@ class _ChatSheetState extends State<ChatSheet> {
     );
   }
 
-  Widget _buildTypingBubble(bool isDark) {
+  Widget _buildTypingBubble(bool isDark, JNewsColors c) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -445,17 +433,17 @@ class _ChatSheetState extends State<ChatSheet> {
             width: 28, height: 28,
             margin: const EdgeInsets.only(top: 4, right: 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF0052CC), Color(0xFF1E88E5)]),
+              gradient: LinearGradient(colors: [c.accent, c.accentLight]),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Center(
-              child: Text('지', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+              child: Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFF5F6FA),
+              color: isDark ? Colors.white.withValues(alpha: 0.08) : c.surfaceAlt,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -463,9 +451,9 @@ class _ChatSheetState extends State<ChatSheet> {
                 bottomRight: Radius.circular(16),
               ),
             ),
-            child: const SizedBox(
+            child: SizedBox(
               width: 24, height: 12,
-              child: _TypingDots(),
+              child: _TypingDots(accentColor: c.accent),
             ),
           ),
         ],
@@ -475,7 +463,8 @@ class _ChatSheetState extends State<ChatSheet> {
 }
 
 class _TypingDots extends StatefulWidget {
-  const _TypingDots();
+  final Color accentColor;
+  const _TypingDots({required this.accentColor});
 
   @override
   State<_TypingDots> createState() => _TypingDotsState();
@@ -511,7 +500,7 @@ class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderState
               child: Container(
                 width: 6, height: 6,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0052CC).withValues(alpha: 0.6),
+                  color: widget.accentColor.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),

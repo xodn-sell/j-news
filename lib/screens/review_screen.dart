@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../services/review_service.dart';
 import '../theme/jnews_colors.dart';
+import '../widgets/achievement_summary.dart';
 
 // ── 디자인 토큰 (DESIGN.md 준수 — Editorial 톤) ──────────────
 // 컬러: context.jColors (ThemeExtension) 경유, 하드코딩 없음
@@ -403,125 +404,25 @@ class _ReviewScreenState extends State<ReviewScreen> {
     );
   }
 
-  // ── 완료 화면 ────────────────────────────────────────────
+  // ── 완료 화면 — AchievementSummary 공용 위젯 사용 ─────────
   Widget _buildComplete(ThemeData theme, bool isDark, JNewsColors c) {
-    final textPrimary =
-        isDark ? theme.colorScheme.onSurface : c.textPrimary;
-    final cardBg =
-        isDark ? theme.colorScheme.surfaceContainerHighest : c.surfaceElevated;
     final stats = _stats;
+    final statRows = stats != null
+        ? <(String, String)>[
+            ('🗂️', '총 카드 ${stats.totalCards}개'),
+            ('🎓', '마스터 ${stats.masteredCount}개'),
+          ]
+        : <(String, String)>[];
 
-    return SingleChildScrollView(
+    return KeyedSubtree(
       key: const ValueKey('complete'),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 디스플레이 타이포 (DESIGN.md display 34px w900)
-          Text(
-            '복습 완료',
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.2,
-              color: textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '오늘 복습 $_reviewedCount개 완료',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-              color: c.accent,
-            ),
-          ),
-          const SizedBox(height: 28),
-
-          // 누적 통계 카드
-          if (stats != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(_kCardRadius),
-                border: isDark
-                    ? null
-                    : Border.all(color: c.accent.withValues(alpha: 0.08)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '누적 학습',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                      color: textPrimary.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _statRow('🗂️', '총 카드 ${stats.totalCards}개', textPrimary),
-                  const SizedBox(height: 12),
-                  _statRow('🎓', '마스터 ${stats.masteredCount}개', textPrimary),
-                ],
-              ),
-            ),
-          const SizedBox(height: 16),
-
-          Center(
-            child: Text(
-              '내일 또 만나요',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: textPrimary.withValues(alpha: 0.40),
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // 닫기 (메인 CTA 1개 원칙)
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: () => Navigator.pop(context),
-              style: FilledButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(_kBtnRadius)),
-              ),
-              child: const Text(
-                '닫기',
-                style:
-                    TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-            ),
-          ),
-        ],
+      child: AchievementSummary(
+        displayTitle: '복습 완료',
+        subtitle: '오늘 복습 $_reviewedCount개 완료',
+        statsLabel: '누적 학습',
+        statRows: statRows,
+        onClose: () => Navigator.pop(context),
       ),
-    );
-  }
-
-  Widget _statRow(String emoji, String label, Color textPrimary) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 16)),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: textPrimary,
-          ),
-        ),
-      ],
     );
   }
 }

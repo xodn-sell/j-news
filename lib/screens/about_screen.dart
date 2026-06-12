@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/notification_service.dart';
+import '../theme/jnews_colors.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -11,7 +13,6 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
 
-  static const String _appVersion = '1.6.0';
   static const String _contactEmail = 'xowns142857@gmail.com';
   static const String _developerName = 'k-jieum';
   static const String _privacyUrl = 'https://backend-ruby-chi-85.vercel.app/privacy';
@@ -19,13 +20,14 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
 
   bool? _notificationGranted;
   bool? _exactAlarmGranted;
-  bool? _batteryOptIgnored;
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkPermissions();
+    _loadVersion();
   }
 
   @override
@@ -40,13 +42,17 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _checkPermissions();
   }
 
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _version = info.version);
+  }
+
   Future<void> _checkPermissions() async {
     final status = await NotificationService.getPermissionStatus();
     if (mounted) {
       setState(() {
         _notificationGranted = status['notification'];
         _exactAlarmGranted = status['exactAlarm'];
-        _batteryOptIgnored = status['batteryOptimization'];
       });
     }
   }
@@ -88,7 +94,8 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildPermissionRow(ThemeData theme, String label, bool? granted) {
-    final color = granted == true ? Colors.green : Colors.red;
+    final jColors = theme.extension<JNewsColors>() ?? JNewsColors.light;
+    final color = granted == true ? jColors.success : jColors.error;
     final icon = granted == true ? Icons.check_circle_outline : Icons.cancel_outlined;
     final text = granted == true ? '허용됨' : (granted == false ? '거부됨' : '확인 중...');
     return Row(
@@ -111,14 +118,13 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final allGranted = (_notificationGranted ?? false) &&
-        (_exactAlarmGranted ?? false) &&
-        (_batteryOptIgnored ?? false);
+    final allGranted = (_notificationGranted ?? false) && (_exactAlarmGranted ?? false);
+    final versionLabel = _version.isEmpty ? '' : '버전 $_version';
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('App Info & Contact / 앱 정보 및 문의'),
+        title: const Text('앱 정보'),
         backgroundColor: theme.colorScheme.surface,
       ),
       body: ListView(
@@ -155,7 +161,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '버전 $_appVersion',
+                  versionLabel,
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
@@ -178,8 +184,6 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                 _buildPermissionRow(theme, '알림 권한', _notificationGranted),
                 const SizedBox(height: 8),
                 _buildPermissionRow(theme, '정확한 알람 권한', _exactAlarmGranted),
-                const SizedBox(height: 8),
-                _buildPermissionRow(theme, '배터리 최적화 제외', _batteryOptIgnored),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -222,12 +226,14 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
             isDark: isDark,
             title: '앱 소개',
             child: Text(
-              'J-news는 AI(Google Gemini)가 미국과 한국의 주요 뉴스를 '
-              '요약·분석하여 제공하는 뉴스 브리핑 앱입니다.\n\n'
-              '모든 뉴스 콘텐츠는 AI가 다양한 언론사의 기사를 기반으로 '
-              '요약한 것이며, 각 뉴스의 원본 출처를 함께 제공합니다.\n\n'
-              '• 미국 뉴스: 화~토 오전 8시 업데이트 (KST)\n'
-              '• 한국 뉴스: 월~금 오후 6시 업데이트 (KST)',
+              'J-news는 Google Gemini AI가 전 세계 주요 뉴스를 '
+              '요약·분석하여 제공하는 글로벌 뉴스 브리핑 앱입니다.\n\n'
+              '매일 오전 7시·낮 12시·오후 6시(KST) 3회 갱신되며, '
+              '세션마다 새 뉴스 7편과 AI 인사이트 1편을 제공합니다.\n\n'
+              '• AI 튜터: 뉴스 카드에서 AI와 1:1 토론\n'
+              '• 퀴즈 & SRS 복습: 읽은 뉴스로 어휘·시사 학습\n'
+              '• 오디오 브리핑: TTS 2인 대화로 뉴스 청취\n\n'
+              '모든 콘텐츠는 AI 요약본이며, 원본 출처를 함께 제공합니다.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.6,
@@ -242,7 +248,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
           _buildSection(
             theme: theme,
             isDark: isDark,
-            title: 'Contact Us / 문의하기',
+            title: '문의하기',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -260,7 +266,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                 _buildInfoRow(
                   theme: theme,
                   icon: Icons.person_outline,
-                  label: '운영자 (Operator)',
+                  label: '운영자',
                   value: _developerName,
                 ),
                 const SizedBox(height: 12),
@@ -271,7 +277,7 @@ class _AboutScreenState extends State<AboutScreen> with WidgetsBindingObserver {
                   child: _buildInfoRow(
                     theme: theme,
                     icon: Icons.email_outlined,
-                    label: '이메일 (Customer Support)',
+                    label: '이메일',
                     value: _contactEmail,
                     isLink: true,
                   ),

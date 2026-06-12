@@ -18,15 +18,17 @@ import 'chat_sheet.dart';
 import 'audio_briefing_screen.dart';
 import 'quiz_screen.dart';
 import '../services/quiz_service.dart';
+import '../theme/jnews_colors.dart';
 
 // ── 토스 디자인 상수 ──
 const _kPrimary = Color(0xFF0052CC);
 const _kPrimaryLight = Color(0xFFE8F0FF);
-const _kOnSurface = Color(0xFF0D1117);
 const _kBg = Color(0xFFF5F6FA);
 const _kCardRadius = 24.0;
 
-Color _onSurfaceAlpha(double a) => _kOnSurface.withValues(alpha: a);
+/// 다크/라이트 대응 onSurface 알파. BuildContext 경유로 테마 색상 사용.
+Color _onSurfaceAlpha(BuildContext context, double a) =>
+    Theme.of(context).colorScheme.onSurface.withValues(alpha: a);
 Color _primaryAlpha(double a) => _kPrimary.withValues(alpha: a);
 
 
@@ -441,8 +443,8 @@ class _NewsTabState extends State<NewsTab>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (_isLoading && _result == null) return _buildSkeleton(theme);
-    if (_error != null) return _buildError(theme);
+    if (_isLoading && _result == null) return _buildSkeleton(context, theme);
+    if (_error != null) return _buildError(context, theme);
     if (_result == null) return _buildEmpty();
 
     final total = _totalCards;
@@ -467,7 +469,7 @@ class _NewsTabState extends State<NewsTab>
           opacity: _completeController,
           child: ScaleTransition(
             scale: completeScaleAnim,
-            child: _buildCompleteScreen(theme, isDark),
+            child: _buildCompleteScreen(context, theme, isDark),
           ),
         ),
       );
@@ -499,8 +501,8 @@ class _NewsTabState extends State<NewsTab>
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // 세 번째 카드 (가장 뒤, 작고 흐리게)
-                  if (_currentIndex + 2 < total)
+                  // 세 번째 카드 (가장 뒤, 작고 흐리게) — 드래그 중에만 노출 (정지 시 뒷면 비침 방지)
+                  if (_currentIndex + 2 < total && (_dragX != 0 || _dragProgress > 0))
                     Positioned.fill(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(22, 22, 22, 6),
@@ -515,8 +517,8 @@ class _NewsTabState extends State<NewsTab>
                       ),
                     ),
 
-                  // 두 번째 카드 (peek) — 드래그 진행에 따라 자연스럽게 떠오름
-                  if (_currentIndex + 1 < total)
+                  // 두 번째 카드 (peek) — 드래그 중에만 노출 (정지 시 뒷면 비침 방지)
+                  if (_currentIndex + 1 < total && (_dragX != 0 || _dragProgress > 0))
                     Positioned.fill(
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -585,14 +587,14 @@ class _NewsTabState extends State<NewsTab>
                                 left: 20, top: 0, bottom: 0,
                                 child: Center(
                                   child: Icon(Icons.chevron_left_rounded, size: 52,
-                                      color: isDark ? Colors.white : _kOnSurface),
+                                      color: isDark ? Colors.white : theme.colorScheme.onSurface),
                                 ),
                               ),
                               Positioned(
                                 right: 20, top: 0, bottom: 0,
                                 child: Center(
                                   child: Icon(Icons.chevron_right_rounded, size: 52,
-                                      color: isDark ? Colors.white : _kOnSurface),
+                                      color: isDark ? Colors.white : theme.colorScheme.onSurface),
                                 ),
                               ),
                               Positioned(
@@ -601,16 +603,37 @@ class _NewsTabState extends State<NewsTab>
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: (isDark ? Colors.white : _kOnSurface).withValues(alpha: 0.92),
+                                      color: (isDark ? Colors.white : Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.92),
                                       borderRadius: BorderRadius.circular(24),
                                     ),
-                                    child: Text(
-                                      '👈 좌우로 넘겨주세요 👉',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: isDark ? _kOnSurface : Colors.white,
-                                      ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ExcludeSemantics(
+                                          child: Icon(
+                                            Icons.arrow_back_rounded,
+                                            size: 16,
+                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '좌우로 넘겨주세요',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        ExcludeSemantics(
+                                          child: Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 16,
+                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -651,6 +674,8 @@ class _NewsTabState extends State<NewsTab>
         onAdFailed: () => _analytics.logEvent(name: 'native_ad_failed', parameters: {'slot': index}),
         onAdImpression: () => _analytics.logEvent(name: 'native_ad_impression', parameters: {'slot': index}),
         onAdClicked: () => _analytics.logEvent(name: 'native_ad_clicked', parameters: {'slot': index}),
+        onPrev: index > 0 ? _goPrev : null,
+        onNext: _goNext,
       );
     }
 
@@ -696,7 +721,7 @@ class _NewsTabState extends State<NewsTab>
   }
 
   // ── 완독 화면 ──
-  Widget _buildCompleteScreen(ThemeData theme, bool isDark) {
+  Widget _buildCompleteScreen(BuildContext context, ThemeData theme, bool isDark) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -762,13 +787,13 @@ class _NewsTabState extends State<NewsTab>
               fontSize: 24,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.7,
-              color: isDark ? theme.colorScheme.onSurface : _kOnSurface,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 10),
           Text(
             '오늘의 주요 뉴스를 모두 확인했어요',
-            style: TextStyle(fontSize: 15, height: 1.5, color: _onSurfaceAlpha(0.45)),
+            style: TextStyle(fontSize: 15, height: 1.5, color: _onSurfaceAlpha(context, 0.45)),
           ),
           const SizedBox(height: 6),
           Row(
@@ -781,7 +806,7 @@ class _NewsTabState extends State<NewsTab>
               const SizedBox(width: 6),
               Text(
                 '매일 오전 7시 · 오후 6시 업데이트',
-                style: TextStyle(fontSize: 12, color: _onSurfaceAlpha(0.35)),
+                style: TextStyle(fontSize: 12, color: _onSurfaceAlpha(context, 0.35)),
               ),
             ],
           ),
@@ -794,7 +819,7 @@ class _NewsTabState extends State<NewsTab>
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: SizedBox(
-                width: double.infinity, height: 52,
+                width: double.infinity, height: 56,
                 child: FilledButton.icon(
                   onPressed: () {
                     _analytics.logEvent(name: 'quiz_started', parameters: {
@@ -832,24 +857,23 @@ class _NewsTabState extends State<NewsTab>
           }),
           const SizedBox(height: 12),
 
-          // 공유 버튼 (보조)
+          // 공유 버튼 (보조 — OutlinedButton)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: SizedBox(
-              width: double.infinity, height: 52,
-              child: FilledButton.icon(
+              width: double.infinity, height: 48,
+              child: OutlinedButton.icon(
                 onPressed: () {
                   final items = _result?.items ?? [];
                   final titles = items.map((i) => '• ${i.title}').join('\n');
                   _shareText('오늘의 J-news 브리핑', '오늘의 주요 뉴스를 모두 읽었어요!\n\n$titles\n\n#J뉴스 #AI뉴스');
                 },
                 icon: const Icon(Icons.ios_share_rounded, size: 18),
-                label: const Text('공유하기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: isDark ? theme.colorScheme.primary : _kPrimary,
+                label: const Text('공유하기', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDark ? Colors.white : _kPrimary,
+                  side: BorderSide(color: (isDark ? Colors.white : _kPrimary).withValues(alpha: 0.35)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: isDark ? 0 : 4,
-                  shadowColor: _primaryAlpha(0.28),
                 ),
               ),
             ),
@@ -903,7 +927,7 @@ class _NewsTabState extends State<NewsTab>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 32, height: 4, decoration: BoxDecoration(color: _onSurfaceAlpha(0.1), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 32, height: 4, decoration: BoxDecoration(color: _onSurfaceAlpha(context, 0.1), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 24),
             Text(glossary.term, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 12),
@@ -917,7 +941,7 @@ class _NewsTabState extends State<NewsTab>
   }
 
   // ── 스켈레톤 ──
-  Widget _buildSkeleton(ThemeData theme) {
+  Widget _buildSkeleton(BuildContext context, ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
     return Stack(
       children: [
@@ -926,7 +950,7 @@ class _NewsTabState extends State<NewsTab>
           highlightColor: isDark ? const Color(0xFF353840) : const Color(0xFFF5F5F5),
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: Container(decoration: BoxDecoration(color: isDark ? const Color(0xFF252830) : Colors.white, borderRadius: BorderRadius.circular(_kCardRadius))),
+            child: Container(decoration: BoxDecoration(color: context.jColors.surfaceCard, borderRadius: BorderRadius.circular(_kCardRadius))),
           ),
         ),
         Positioned(
@@ -938,7 +962,7 @@ class _NewsTabState extends State<NewsTab>
               'AI가 뉴스를 정리하고 있어요',
               style: TextStyle(
                 fontSize: 13,
-                color: const Color(0xFF0D1117).withValues(alpha: 0.35),
+                color: _onSurfaceAlpha(context, 0.35),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -949,16 +973,16 @@ class _NewsTabState extends State<NewsTab>
   }
 
   Widget _buildEmpty() => const Center(child: Text('뉴스가 없어요.'));
-  Widget _buildError(ThemeData theme) {
+  Widget _buildError(BuildContext context, ThemeData theme) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('📡', style: TextStyle(fontSize: 40, color: _onSurfaceAlpha(0.35))),
+          Text('📡', style: TextStyle(fontSize: 40, color: _onSurfaceAlpha(context, 0.35))),
           const SizedBox(height: 12),
-          Text('뉴스를 불러오지 못했어요', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _onSurfaceAlpha(0.7))),
+          Text('뉴스를 불러오지 못했어요', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _onSurfaceAlpha(context, 0.7))),
           const SizedBox(height: 6),
-          Text('인터넷 연결을 확인하고\n다시 시도해주세요', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: _onSurfaceAlpha(0.45))),
+          Text('인터넷 연결을 확인하고\n다시 시도해주세요', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: _onSurfaceAlpha(context, 0.45))),
           const SizedBox(height: 20),
           SizedBox(
             height: 48,
@@ -1073,7 +1097,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
     final isDark = widget.isDark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF252830) : Colors.white,
+        color: context.jColors.surfaceCard,
         borderRadius: BorderRadius.circular(_kCardRadius),
         boxShadow: isDark ? null : const [
           BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
@@ -1139,48 +1163,68 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                           ),
                         ),
                       const Spacer(),
-                      // 북마크 버튼
-                      GestureDetector(
-                        onTap: _toggleBookmark,
-                        child: Container(
-                          width: 32, height: 32,
-                          decoration: BoxDecoration(
-                            color: _bookmarked
-                                ? _primaryAlpha(isDark ? 0.22 : 0.10)
-                                : _onSurfaceAlpha(isDark ? 0.08 : 0.05),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            _bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-                            size: 16,
-                            color: _bookmarked ? _kPrimary : _onSurfaceAlpha(0.45),
+                      // 북마크 버튼 (48dp 히트 영역)
+                      Semantics(
+                        label: _bookmarked ? '북마크 해제' : '북마크',
+                        button: true,
+                        child: GestureDetector(
+                          onTap: _toggleBookmark,
+                          behavior: HitTestBehavior.opaque,
+                          child: SizedBox(
+                            width: 40, height: 40,
+                            child: Center(
+                              child: Container(
+                                width: 32, height: 32,
+                                decoration: BoxDecoration(
+                                  color: _bookmarked
+                                      ? _primaryAlpha(isDark ? 0.22 : 0.10)
+                                      : _onSurfaceAlpha(context, isDark ? 0.08 : 0.05),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(
+                                  _bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                                  size: 16,
+                                  color: _bookmarked ? _kPrimary : _onSurfaceAlpha(context, 0.45),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 6),
-                      // 공유 버튼
-                      GestureDetector(
-                        onTap: widget.onShare,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _onSurfaceAlpha(isDark ? 0.08 : 0.05),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.ios_share_rounded, size: 13, color: _onSurfaceAlpha(0.4)),
-                              const SizedBox(width: 5),
-                              Text(
-                                '공유',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _onSurfaceAlpha(0.4),
+                      // 공유 버튼 (48dp 히트 영역)
+                      Semantics(
+                        label: '공유',
+                        button: true,
+                        child: GestureDetector(
+                          onTap: widget.onShare,
+                          behavior: HitTestBehavior.opaque,
+                          child: SizedBox(
+                            height: 40,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _onSurfaceAlpha(context, isDark ? 0.08 : 0.05),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.ios_share_rounded, size: 13, color: _onSurfaceAlpha(context, 0.4)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '공유',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: _onSurfaceAlpha(context, 0.4),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -1198,7 +1242,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                       fontWeight: FontWeight.w900,
                       height: 1.35,
                       letterSpacing: -0.6,
-                      color: isDark ? Colors.white : _kOnSurface,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1219,7 +1263,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                                   fontSize: 15,
                                   fontWeight: FontWeight.w400,
                                   height: 1.7,
-                                  color: isDark ? Colors.white.withValues(alpha: 0.7) : _onSurfaceAlpha(0.70),
+                                  color: isDark ? Colors.white.withValues(alpha: 0.7) : _onSurfaceAlpha(context, 0.70),
                                 ),
                               ),
                               if (!_expanded)
@@ -1237,7 +1281,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                                     blendMode: BlendMode.dstIn,
                                     child: Container(
                                       height: 40,
-                                      color: isDark ? const Color(0xFF252830) : Colors.white,
+                                      color: context.jColors.surfaceCard,
                                     ),
                                   ),
                                 ),
@@ -1247,14 +1291,18 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         if (_expanded || item.body.length >= 200)
                           GestureDetector(
                             onTap: () => setState(() => _expanded = !_expanded),
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                _expanded ? '접기' : '더 보기',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0052CC),
+                            behavior: HitTestBehavior.opaque,
+                            child: SizedBox(
+                              height: 32,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _expanded ? '접기' : '더 보기',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0052CC),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1272,22 +1320,32 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         child: Row(
                           children: item.glossary.map((g) => Padding(
                             padding: const EdgeInsets.only(right: 6),
-                            child: GestureDetector(
-                              onTap: () => widget.onGlossaryTap(g),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: _primaryAlpha(0.08),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: _primaryAlpha(0.15), width: 1),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.info_outline_rounded, size: 11, color: _primaryAlpha(0.7)),
-                                    const SizedBox(width: 4),
-                                    Text(g.term, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary)),
-                                  ],
+                            child: Semantics(
+                              label: '용어: ${g.term}',
+                              button: true,
+                              child: GestureDetector(
+                                onTap: () => widget.onGlossaryTap(g),
+                                behavior: HitTestBehavior.opaque,
+                                child: SizedBox(
+                                  height: 36,
+                                  child: Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: _primaryAlpha(0.08),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: _primaryAlpha(0.15), width: 1),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.info_outline_rounded, size: 11, color: _primaryAlpha(0.7)),
+                                          const SizedBox(width: 4),
+                                          Text(g.term, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1305,18 +1363,21 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
             child: SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 46,
               child: FilledButton.icon(
                 onPressed: widget.onChatTap,
                 icon: const Icon(Icons.forum_rounded, size: 16),
                 label: const Text(
-                  'AI랑 이 뉴스 토론',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  'AI 튜터에게 물어보기',
+                  // height 명시 + 패딩 제거 — 고정 높이 버튼에서 한글 글리프 하단 클리핑 방지
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.2),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: widget.isDark ? _primaryAlpha(0.22) : _kPrimaryLight,
                   foregroundColor: _kPrimary,
                   elevation: 0,
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -1349,7 +1410,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                 const SizedBox(width: 8),
                 Text(
                   'AI 요약 · 원문을 확인하세요',
-                  style: TextStyle(fontSize: 10, color: _onSurfaceAlpha(0.35)),
+                  style: TextStyle(fontSize: 10, color: _onSurfaceAlpha(context, 0.35)),
                 ),
               ],
             ),
@@ -1381,7 +1442,7 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('원문 출처', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _onSurfaceAlpha(0.45))),
+                          Text('원문 출처', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _onSurfaceAlpha(context, 0.45))),
                           if (item.sourceLabel.isNotEmpty)
                             Text(item.sourceLabel, maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary)),

@@ -332,7 +332,7 @@ class _LoginScreenState extends State<LoginScreen>
                         // 피처 하이라이트
                         const _FeatureRow(icon: '📰', title: '하루 3번 AI 뉴스 브리핑', sub: '아침·점심·저녁 자동 큐레이션'),
                         const SizedBox(height: 8),
-                        const _FeatureRow(icon: '💬', title: 'AI랑 뉴스 토론', sub: '궁금한 점 바로 물어보기'),
+                        const _FeatureRow(icon: '💬', title: 'AI 튜터', sub: '궁금한 점 바로 물어보기'),
                         const SizedBox(height: 8),
                         const _FeatureRow(icon: '🎧', title: '오디오로 듣기', sub: '진행자 2명의 라디오 브리핑'),
 

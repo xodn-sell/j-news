@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../models/news_result.dart';
 import '../services/audio_briefing_service.dart';
+import '../theme/jnews_colors.dart';
 
 class AudioBriefingScreen extends StatefulWidget {
   final List<DialogueTurn> dialogue;
@@ -65,7 +66,9 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0D1117) : Colors.white;
+    final c = context.jColors;
+    // `:68` 라이트 bg → surfaceBase 토큰 경유 (Colors.white 하드코딩 제거)
+    final bg = c.surfaceBase;
 
     if (widget.dialogue.isEmpty) {
       return Scaffold(
@@ -103,7 +106,7 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : const Color(0xFF0D1117),
+                    color: isDark ? c.textPrimary : c.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -111,7 +114,7 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                   '지음 & 소나 · ${widget.dialogue.length}개 발화',
                   style: TextStyle(
                     fontSize: 12,
-                    color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.5),
+                    color: c.textMuted,
                   ),
                 ),
               ],
@@ -128,7 +131,9 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                 final turn = widget.dialogue[i];
                 final isCurrent = i == _service.currentIndex;
                 final isA = turn.speaker == 'A';
-                final accent = isA ? const Color(0xFF0052CC) : const Color(0xFFE91E63);
+                // `:131` 소나 색 #E91E63 핑크 제거 — "채도 높은 보조색 금지"(DESIGN.md §7)
+                // 화자 구분: A=accent(브랜드 블루), B=accentDeep(명도 차 대비)
+                final accent = isA ? c.accent : c.accentDeep;
                 final name = isA ? '지음' : '소나';
 
                 return InkWell(
@@ -175,8 +180,7 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                                 turn.text,
                                 style: TextStyle(
                                   fontSize: 14, height: 1.5,
-                                  color: (isDark ? Colors.white : const Color(0xFF0D1117))
-                                      .withValues(alpha: isCurrent ? 1.0 : 0.65),
+                                  color: c.textPrimary.withValues(alpha: isCurrent ? 1.0 : 0.65),
                                   fontWeight: isCurrent ? FontWeight.w500 : FontWeight.w400,
                                 ),
                               ),
@@ -192,12 +196,13 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
           ),
 
           // 컨트롤 바
+          // `:198` 다크 #1C1C1E (iOS 시스템 컬러) → surfaceCard 토큰 경유
           Container(
             padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF5F6FA),
+              color: isDark ? c.surfaceCard : c.surfaceAlt,
               border: Border(
-                top: BorderSide(color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.06)),
+                top: BorderSide(color: c.borderHair),
               ),
             ),
             child: Column(
@@ -208,8 +213,8 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                   child: LinearProgressIndicator(
                     value: _service.progress,
                     minHeight: 4,
-                    backgroundColor: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.08),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0052CC)),
+                    backgroundColor: c.borderHair,
+                    valueColor: AlwaysStoppedAnimation<Color>(c.accent),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -217,9 +222,9 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('${_service.currentIndex + 1}',
-                      style: TextStyle(fontSize: 11, color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.5))),
+                      style: TextStyle(fontSize: 11, color: c.textMuted)),
                     Text('${_service.totalTurns}',
-                      style: TextStyle(fontSize: 11, color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.5))),
+                      style: TextStyle(fontSize: 11, color: c.textMuted)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -232,7 +237,7 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                       size: 36,
                     ),
                     Material(
-                      color: const Color(0xFF0052CC),
+                      color: c.accent,
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
@@ -263,30 +268,36 @@ class _AudioBriefingScreenState extends State<AudioBriefingScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // 속도 컨트롤
+                // `:269-295` 속도 칩 — 히트 영역 48dp 확장 (SizedBox.fromSize wrapper)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [0.75, 1.0, 1.25, 1.5].map((s) {
                     final isActive = (_service.speed - s).abs() < 0.01;
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: InkWell(
-                        onTap: () => _service.setSpeed(s),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isActive ? const Color(0xFF0052CC) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: isActive ? const Color(0xFF0052CC) : (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.15),
-                            ),
-                          ),
-                          child: Text(
-                            '${s}x',
-                            style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600,
-                              color: isActive ? Colors.white : (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.6),
+                      child: SizedBox(
+                        // 히트 영역 48dp 확보 (DESIGN.md accessibility.minTouchTarget)
+                        height: 48,
+                        child: InkWell(
+                          onTap: () => _service.setSpeed(s),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isActive ? c.accent : Colors.transparent,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isActive ? c.accent : c.borderSoft,
+                                ),
+                              ),
+                              child: Text(
+                                '${s}x',
+                                style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600,
+                                  color: isActive ? Colors.white : c.textMuted,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -312,7 +323,7 @@ class _CtrlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.jColors;
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
@@ -324,7 +335,7 @@ class _CtrlButton extends StatelessWidget {
           child: Icon(
             icon,
             size: size,
-            color: (isDark ? Colors.white : const Color(0xFF0D1117)).withValues(alpha: 0.8),
+            color: c.textPrimary.withValues(alpha: 0.8),
           ),
         ),
       ),

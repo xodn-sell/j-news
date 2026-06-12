@@ -33,6 +33,7 @@ colors:
     # Surface
     surfaceBase: "#FBFBFE"        # 메인 배경 (쿨톤 1% 화이트).
     surfaceElevated: "#FFFFFF"    # 카드 본체.
+    surfaceCard: "#FFFFFF"        # 카드 메인 — ThemeExtension `surfaceCard` (dark: #1C2128) 대응 라이트 값.
     surfaceAlt: "#F5F6FA"         # 리스트·서브 배경 — 10회 사용.
     surfaceTint: "#EEF4FF"        # 로그인 그라데이션 중간.
     surfaceTintDeep: "#E8F0FF"    # 로그인 그라데이션 하단.
@@ -290,6 +291,26 @@ components:
     fontWeight: 800
     maxLabel: "9+"
 
+  # SRS 복습 배너 (home_screen `_ReviewBanner`) — due>0일 때만 노출
+  reviewBanner:
+    height: 48
+    radius: 16
+    bg: surfaceTint             # #EEF4FF — editorial 톤 절제
+    layout: "Row(카드 아이콘 + '오늘 복습할 카드 N개' + chevron)"
+    fontSize: 14
+    fontWeight: 800
+    fg: accent
+    tap: "review_screen 라우팅 (헤더 아이콘과 동일)"
+    semantics: "label 필수 (due 카운트 포함)"
+
+  # 완료/결과 요약 (review_screen 완료 + quiz_screen 결과 공용 — widgets/achievement_summary.dart)
+  achievementSummary:
+    layout: "display 타이포 타이틀 + 통계 카드(statRows) + subtitle + 닫기"
+    titleScale: headlineLarge   # display 34, w900
+    statRows: "List<(label, value)> — 라벨 w500 textMuted / 값 w800"
+    actions: "닫기(filled) + secondaryAction?(outlined — 예: 공유)"
+    tone: Editorial             # 컨페티/elasticOut 금지, 200ms fade
+
 # ── 모션 ──────────────────────────────────────────
 motion:
   fadeEntry:
@@ -467,12 +488,13 @@ accessibility:
 5. `#1C2128` — 7회 → `surfaceCard` (dark)
 
 **점진적 마이그레이션 전략**:
-1. **Phase 1**: `ThemeExtension<JNewsColors>` 정의 → `main.dart` ThemeData에 등록.
-2. **Phase 2**: 화면별 변환 — `login_screen` → `home_screen` → `onboarding` → 기타.
+1. **Phase 1**: `ThemeExtension<JNewsColors>` 정의 → `main.dart` ThemeData에 등록. ✅
+2. **Phase 2**: 화면별 변환 — `login_screen` → `home_screen` → `onboarding` → 기타. **대부분 완료 (2026-06-11)**: news_tab(`_onSurfaceAlpha` theme-aware화), onboarding, bookmark, quiz, audio_briefing, chat_sheet, native_ad_card, about 토큰 경유 전환. 위 인벤토리 표는 2026-04-25 실측 — 현재는 크게 감소.
 3. **Phase 3**: lint 규칙 추가 — `Color(0xFF...)` 직접 사용 금지.
 
 ## 11. 변경 이력
 
+- **2026-06-11 v1.3.0** — 전면 UI/UX 정비: ① 다크모드 토글 복구 (설정, 기본 system) + news_tab/native_ad_card/상태바 다크 깨짐 수리. ② 컴포넌트 2종 추가 (reviewBanner, achievementSummary). ③ 라이트 `surfaceCard` 토큰 명시. ④ 터치 타겟 48dp 일괄 (헤더/북마크/공유칩/용어칩/속도칩) + Semantics/tooltip. ⑤ 완독 CTA 위계 (퀴즈 filled 56h / 공유 outlined 48h). ⑥ 카피 통일 ("AI 튜터"), about 스테일 카피·배터리 행 제거, 버전 package_info_plus 단일화. ⑦ 토큰 위반 정리 (소나 핑크→accentDeep, amber→accent, radius 14/20→16, 비토큰 색 제거).
 - **2026-06-10 v1.2.1** — 학습앱 전환 P2: SRS 복습 컴포넌트 3종 추가 (reviewFlashCard, dueDateChip, dueBadge). 복습 화면은 Editorial 단일 톤 (컨페티/elasticOut 금지, 200ms fade).
 - **2026-05-08 v1.2.0** — 톤 전략 (Editorial Base + Gamified Rewards) 섹션 8 추가. 두 톤 명확 분리. 카드/홈/온보딩=editorial, gacha_dialog/완독토스트=gamified.
 - **2026-04-25 v1.1.0** — 실측 기반 재작성. 192개 하드코딩 분석 → brand accent(`#0052CC`) 추가, text/surface 보정, state 컬러 정의, 컴포넌트 8종 추가, Tech Debt 인벤토리 추가.

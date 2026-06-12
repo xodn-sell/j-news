@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/bookmark_service.dart';
+import '../theme/jnews_colors.dart';
 
 class BookmarkScreen extends StatefulWidget {
   const BookmarkScreen({super.key});
@@ -47,12 +48,26 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final c = context.jColors;
 
     return Scaffold(
+      backgroundColor: isDark ? theme.colorScheme.surface : c.surfaceAlt,
+      // 커스텀 헤더 (home/review 스타일 통일 — w900 에디토리얼)
       appBar: AppBar(
-        title: const Text('북마크', style: TextStyle(fontWeight: FontWeight.w800)),
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: isDark ? theme.colorScheme.surface : c.surfaceElevated,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        title: Text(
+          '북마크',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.5,
+            color: isDark ? c.textPrimary : c.textPrimary,
+          ),
+        ),
       ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -61,16 +76,17 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.bookmark_outline, size: 64, color: Colors.grey[300]),
+                  // 빈 상태 — jColors 토큰 (다크 대응)
+                  Icon(Icons.bookmark_outline, size: 64, color: c.textMuted.withValues(alpha: 0.4)),
                   const SizedBox(height: 16),
                   Text(
                     '저장된 북마크가 없습니다',
-                    style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600),
+                    style: TextStyle(color: c.textMuted, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '뉴스 카드의 북마크 아이콘을 눌러 저장하세요',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    style: TextStyle(color: c.textMuted.withValues(alpha: 0.65), fontSize: 13),
                   ),
                 ],
               ),
@@ -90,10 +106,11 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 20),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(20),
+                        // error 토큰 계열 + 다크 대응, radius 16 (DESIGN.md radius.md)
+                        color: c.error.withValues(alpha: isDark ? 0.20 : 0.08),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.delete_outline, color: Colors.red),
+                      child: Icon(Icons.delete_outline, color: c.error),
                     ),
                     child: Card(
                       child: Padding(
@@ -113,9 +130,10 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
                                     ),
                                   ),
                                 ),
+                                // 북마크 아이콘 — warning(amber) → accent 토큰
                                 IconButton(
                                   onPressed: () => _removeBookmark(item),
-                                  icon: Icon(Icons.bookmark, size: 20, color: Colors.amber[700]),
+                                  icon: Icon(Icons.bookmark, size: 20, color: c.accent),
                                   visualDensity: VisualDensity.compact,
                                 ),
                               ],
@@ -137,13 +155,13 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
                                 onTap: () => _openUrl(item.sourceUrl!),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.link, size: 14, color: theme.colorScheme.primary),
+                                    Icon(Icons.link, size: 14, color: c.accent),
                                     const SizedBox(width: 6),
                                     Text(
                                       item.sourceLabel ?? '원문 보기',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: theme.colorScheme.primary,
+                                        color: c.accent,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),

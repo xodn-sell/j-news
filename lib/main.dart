@@ -19,10 +19,9 @@ void main() async {
   final bootStart = DateTime.now();
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 부팅 시 초기 오버레이 스타일 — 이후 AppBarTheme.systemOverlayStyle 이 덮어씀
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
   ));
 
   await Firebase.initializeApp();
@@ -68,6 +67,7 @@ void main() async {
   }
 
   final prefs = await SharedPreferences.getInstance();
+  // 기본 라이트 — 다크는 설정에서 명시 선택한 유저만 (시스템 추종 기본은 첫인상 저하)
   final themeModeStr = prefs.getString('theme_mode') ?? 'light';
   final isSignedIn = AuthService.isSignedIn;
 
@@ -128,6 +128,18 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       title: 'J-news',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.2,
+            ),
+          ),
+          child: child!,
+        );
+      },
       theme: ThemeData(
         extensions: const [JNewsColors.light],
         colorScheme: ColorScheme.fromSeed(
@@ -136,14 +148,14 @@ class MyApp extends StatelessWidget {
           surface: const Color(0xFFFBFBFE),
           primary: const Color(0xFF1B2838),
           onPrimary: Colors.white,
-          secondary: const Color(0xFF0066FF),
+          secondary: const Color(0xFF0052CC),
           surfaceContainerHighest: const Color(0xFFF1F3F9),
         ),
         useMaterial3: true,
         textTheme: baseTextTheme.copyWith(
-          headlineLarge: baseTextTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.8, color: const Color(0xFF121212)),
-          headlineMedium: baseTextTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.2, color: const Color(0xFF121212)),
-          titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8, color: const Color(0xFF121212)),
+          headlineLarge: baseTextTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.8, color: const Color(0xFF0D1117)),
+          headlineMedium: baseTextTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.2, color: const Color(0xFF0D1117)),
+          titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8, color: const Color(0xFF0D1117)),
           bodyLarge: baseTextTheme.bodyLarge?.copyWith(height: 1.75, letterSpacing: -0.3, color: const Color(0xFF2D2D2D)),
           bodyMedium: baseTextTheme.bodyMedium?.copyWith(height: 1.65, letterSpacing: -0.2, color: const Color(0xFF424242)),
         ),
@@ -162,6 +174,11 @@ class MyApp extends StatelessWidget {
           centerTitle: false,
           backgroundColor: Color(0xFFFBFBFE),
           surfaceTintColor: Colors.transparent,
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
@@ -204,6 +221,11 @@ class MyApp extends StatelessWidget {
           scrolledUnderElevation: 0,
           centerTitle: false,
           backgroundColor: Color(0xFF0F1115),
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(

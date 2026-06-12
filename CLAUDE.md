@@ -101,10 +101,10 @@ toss-miniapp/
 - Firebase Auth (`AuthService.init()`) → 로그인 안 됐으면 `LoginScreen`
 - 최초 실행: `onboarding_done` SharedPreferences 키로 `OnboardingScreen` 표시
 - 기능 안내: `feature_tour_done` 키로 `FeatureTourScreen` 최초 1회 표시
-- 테마: `themeModeNotifier` (ValueNotifier\<ThemeMode\>, main.dart 전역)
+- 테마: `themeModeNotifier` (ValueNotifier\<ThemeMode\>, main.dart 전역). **기본값 `light`** (시스템 추종 기본 금지 — 다크 첫인상 별로라는 사용자 결정). 설정 화면 테마 타일 (라이트/다크/시스템 다이얼로그) → `SettingsService.saveThemeMode()` (v1.6.x 토글 복구)
 
-### Flutter — AI 토론 (v1.5.x 신규)
-- 각 뉴스 카드 하단에 "AI랑 이 뉴스 토론" 버튼 → `ChatSheet` 바텀시트
+### Flutter — AI 튜터 (v1.5.x 신규, 구 "AI 토론")
+- 각 뉴스 카드 하단에 "AI 튜터에게 물어보기" 버튼 → `ChatSheet` 바텀시트 (헤더 "AI 튜터" — 카피 통일 v1.6.x)
 - `chat_service.dart` → `POST /api/chat` (Gemini Flash). 뉴스 title/body context + history 전달
 - 무료/무제한 (광고 게이트 없음). 추후 일 N회 제한 + 보상형 광고 검토
 
@@ -137,7 +137,7 @@ toss-miniapp/
 - 라이트 모드 전용, 핀치줌 비활성화 (`user-scalable=no`) 유지
 
 ## 현재 버전
-- Flutter 앱: `1.3.0+23` (pubspec.yaml 1곳, about_screen.dart 1곳, settings_screen.dart 2곳 — 총 4곳)
+- Flutter 앱: `1.6.0+24` — **pubspec.yaml 1곳만 수정** (앱 내 버전 표기는 `package_info_plus` 런타임 조회, 하드코딩 제거됨 v1.6.x)
 
 ## 광고 구성 (v1.3.0+)
 - **네이티브 광고 풀카드** (Android 커스텀 `NativeAdFactory` 구현)

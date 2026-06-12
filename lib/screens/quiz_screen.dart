@@ -4,22 +4,15 @@ import 'package:share_plus/share_plus.dart' as share_plus;
 import '../models/news_result.dart';
 import '../services/quiz_service.dart';
 import '../services/review_service.dart';
+import '../theme/jnews_colors.dart';
+import '../widgets/achievement_summary.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 // ── 디자인 토큰 (DESIGN.md 준수) ─────────────────────────────
-// accent: #0052CC  (DESIGN.md colors.light.accent)
-// success: #34C759 (DESIGN.md colors.light.success)
-// error: #FF3B30   (DESIGN.md colors.light.error)
-// textPrimary: #0D1117 (DESIGN.md colors.light.textPrimary)
-// surfaceAlt: #F5F6FA  (DESIGN.md colors.light.surfaceAlt)
+// 컬러: context.jColors (ThemeExtension) 경유, 하드코딩 없음
 // radius xl=24, md=16, lg=18 (DESIGN.md radius)
 // motion: 200ms easeInOut (DESIGN.md motion.fade — editorial tone)
 
-const _kAccent = Color(0xFF0052CC);
-const _kSuccess = Color(0xFF34C759);
-const _kErrorRed = Color(0xFFFF3B30);
-const _kTextPrimary = Color(0xFF0D1117);
-const _kSurfaceAlt = Color(0xFFF5F6FA);
 const _kCardRadius = 24.0;  // radius.xl
 const _kChoiceRadius = 16.0; // radius.md
 const _kBtnRadius = 18.0;    // radius.lg
@@ -164,10 +157,11 @@ class _QuizScreenState extends State<QuizScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final c = context.jColors;
 
     return Scaffold(
       backgroundColor:
-          isDark ? theme.colorScheme.surface : _kSurfaceAlt,
+          isDark ? theme.colorScheme.surface : c.surfaceAlt,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -177,32 +171,32 @@ class _QuizScreenState extends State<QuizScreen>
           onPressed: () => Navigator.pop(context),
         ),
         title: _phase == _QuizPhase.question
-            ? _buildProgressDots(isDark)
+            ? _buildProgressDots(isDark, c)
             : null,
         centerTitle: true,
       ),
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: _kFeedbackDuration,
-          child: _buildPhase(theme, isDark),
+          child: _buildPhase(theme, isDark, c),
         ),
       ),
     );
   }
 
-  Widget _buildPhase(ThemeData theme, bool isDark) {
+  Widget _buildPhase(ThemeData theme, bool isDark, JNewsColors c) {
     switch (_phase) {
       case _QuizPhase.intro:
-        return _buildIntro(theme, isDark);
+        return _buildIntro(theme, isDark, c);
       case _QuizPhase.question:
-        return _buildQuestion(theme, isDark);
+        return _buildQuestion(theme, isDark, c);
       case _QuizPhase.result:
-        return _buildResult(theme, isDark);
+        return _buildResult(theme, isDark, c);
     }
   }
 
   // ── 진행 도트 ────────────────────────────────────────────
-  Widget _buildProgressDots(bool isDark) {
+  Widget _buildProgressDots(bool isDark, JNewsColors c) {
     final total = widget.questions.length;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -215,11 +209,12 @@ class _QuizScreenState extends State<QuizScreen>
           width: current ? 20 : 8,
           height: 8,
           decoration: BoxDecoration(
+            // accent 토큰 경유: 다크에서는 dark.accent(#4A90D9), 라이트에서는 #0052CC
             color: done
-                ? _kAccent
+                ? c.accent
                 : current
-                    ? _kAccent
-                    : _kAccent.withValues(alpha: 0.20),
+                    ? c.accent
+                    : c.accent.withValues(alpha: 0.20),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -228,9 +223,9 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   // ── A. 인트로 ────────────────────────────────────────────
-  Widget _buildIntro(ThemeData theme, bool isDark) {
+  Widget _buildIntro(ThemeData theme, bool isDark, JNewsColors c) {
     final textPrimary =
-        isDark ? theme.colorScheme.onSurface : _kTextPrimary;
+        isDark ? theme.colorScheme.onSurface : c.textPrimary;
     return Padding(
       key: const ValueKey('intro'),
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -243,11 +238,11 @@ class _QuizScreenState extends State<QuizScreen>
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: _kAccent.withValues(alpha: 0.10),
+              color: c.accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.quiz_rounded,
-                color: _kAccent, size: 28),
+            child: Icon(Icons.quiz_rounded,
+                color: c.accent, size: 28),
           ),
           const SizedBox(height: 20),
           Text(
@@ -276,7 +271,7 @@ class _QuizScreenState extends State<QuizScreen>
               onPressed: () =>
                   setState(() => _phase = _QuizPhase.question),
               style: FilledButton.styleFrom(
-                backgroundColor: _kAccent,
+                backgroundColor: c.accent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(_kBtnRadius)),
@@ -294,13 +289,13 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   // ── B. 문제 카드 ─────────────────────────────────────────
-  Widget _buildQuestion(ThemeData theme, bool isDark) {
+  Widget _buildQuestion(ThemeData theme, bool isDark, JNewsColors c) {
     final q = _currentQ;
     final textPrimary =
-        isDark ? theme.colorScheme.onSurface : _kTextPrimary;
+        isDark ? theme.colorScheme.onSurface : c.textPrimary;
     final cardBg = isDark
         ? theme.colorScheme.surfaceContainerHighest
-        : Colors.white;
+        : c.surfaceElevated;
 
     return SingleChildScrollView(
       key: ValueKey('q_$_qIndex'),
@@ -316,7 +311,8 @@ class _QuizScreenState extends State<QuizScreen>
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _kAccent.withValues(alpha: 0.80),
+                  // accent 토큰 경유: 다크 #4A90D9, 라이트 #0052CC — WCAG AA 충족
+                  color: c.accent.withValues(alpha: 0.80),
                 ),
               ),
               const SizedBox(width: 8),
@@ -324,15 +320,15 @@ class _QuizScreenState extends State<QuizScreen>
                 padding: const EdgeInsets.symmetric(
                     horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _kAccent.withValues(alpha: 0.08),
+                  color: c.accent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   q.type == 'ox' ? 'O/X' : '4지선다',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: _kAccent,
+                    color: c.accent,
                   ),
                 ),
               ),
@@ -350,7 +346,7 @@ class _QuizScreenState extends State<QuizScreen>
               border: isDark
                   ? null
                   : Border.all(
-                      color: _kAccent.withValues(alpha: 0.08)),
+                      color: c.accent.withValues(alpha: 0.08)),
             ),
             child: Text(
               q.question,
@@ -370,7 +366,7 @@ class _QuizScreenState extends State<QuizScreen>
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _buildChoice(
-                  i, q.options[i], q.answerIndex, isDark, textPrimary),
+                  i, q.options[i], q.answerIndex, isDark, textPrimary, c),
             );
           }),
 
@@ -384,9 +380,9 @@ class _QuizScreenState extends State<QuizScreen>
               child: FilledButton(
                 onPressed: _selectedOption != null ? _reveal : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _kAccent,
+                  backgroundColor: c.accent,
                   disabledBackgroundColor:
-                      _kAccent.withValues(alpha: 0.30),
+                      c.accent.withValues(alpha: 0.30),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius:
@@ -401,14 +397,14 @@ class _QuizScreenState extends State<QuizScreen>
             ),
 
           // 해설 패널 (slideUp 200ms)
-          if (_revealed) _buildFeedbackPanel(q, isDark, textPrimary),
+          if (_revealed) _buildFeedbackPanel(q, isDark, textPrimary, c),
         ],
       ),
     );
   }
 
   Widget _buildChoice(int idx, String label, int answerIdx,
-      bool isDark, Color textPrimary) {
+      bool isDark, Color textPrimary, JNewsColors c) {
     // 상태 계산
     final isSelected = _selectedOption == idx;
     final isAnswer = idx == answerIdx;
@@ -419,32 +415,32 @@ class _QuizScreenState extends State<QuizScreen>
 
     if (_revealed) {
       if (isAnswer) {
-        // 정답
-        borderColor = _kSuccess;
-        bgColor = _kSuccess.withValues(alpha: 0.08);
-        trailingIcon = const Icon(Icons.check_circle_rounded,
-            color: _kSuccess, size: 20);
+        // 정답 — state 컬러 예외 허용 (success)
+        borderColor = c.success;
+        bgColor = c.success.withValues(alpha: 0.08);
+        trailingIcon = Icon(Icons.check_circle_rounded,
+            color: c.success, size: 20);
       } else if (isSelected) {
-        // 내가 고른 오답
-        borderColor = _kErrorRed;
-        bgColor = _kErrorRed.withValues(alpha: 0.08);
-        trailingIcon = const Icon(Icons.cancel_rounded,
-            color: _kErrorRed, size: 20);
+        // 내가 고른 오답 — state 컬러 예외 허용 (error)
+        borderColor = c.error;
+        bgColor = c.error.withValues(alpha: 0.08);
+        trailingIcon = Icon(Icons.cancel_rounded,
+            color: c.error, size: 20);
       } else {
         borderColor = Colors.transparent;
         bgColor = isDark
             ? Colors.white.withValues(alpha: 0.05)
-            : _kSurfaceAlt;
+            : c.surfaceAlt;
       }
     } else if (isSelected) {
       // 선택됨(미확정)
-      borderColor = _kAccent;
-      bgColor = _kAccent.withValues(alpha: 0.06);
+      borderColor = c.accent;
+      bgColor = c.accent.withValues(alpha: 0.06);
     } else {
       borderColor = Colors.transparent;
       bgColor = isDark
           ? Colors.white.withValues(alpha: 0.05)
-          : _kSurfaceAlt;
+          : c.surfaceAlt;
     }
 
     return GestureDetector(
@@ -478,9 +474,10 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   Widget _buildFeedbackPanel(
-      QuizQuestion q, bool isDark, Color textPrimary) {
+      QuizQuestion q, bool isDark, Color textPrimary, JNewsColors c) {
     final isCorrect = _selectedOption == q.answerIndex;
-    final stateColor = isCorrect ? _kSuccess : _kErrorRed;
+    // state 컬러 예외 허용 (success/error)
+    final stateColor = isCorrect ? c.success : c.error;
     final label = isCorrect ? '정답이에요' : '아쉬워요';
     final icon = isCorrect ? '✅' : '❌';
     final isLast = _qIndex >= widget.questions.length - 1;
@@ -536,7 +533,7 @@ class _QuizScreenState extends State<QuizScreen>
                 child: FilledButton(
                   onPressed: _nextQuestion,
                   style: FilledButton.styleFrom(
-                    backgroundColor: _kAccent,
+                    backgroundColor: c.accent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius:
@@ -556,162 +553,49 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  // ── C. 결과 화면 ─────────────────────────────────────────
-  Widget _buildResult(ThemeData theme, bool isDark) {
+  // ── C. 결과 화면 — AchievementSummary 공용 위젯 사용 ─────
+  Widget _buildResult(ThemeData theme, bool isDark, JNewsColors c) {
     final total = widget.questions.length;
     final allCorrect = _correctCount == total;
     final textPrimary =
-        isDark ? theme.colorScheme.onSurface : _kTextPrimary;
-    final cardBg =
-        isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white;
-    final scoreColor =
-        allCorrect ? _kAccent : textPrimary;
+        isDark ? theme.colorScheme.onSurface : c.textPrimary;
     final copyLine = allCorrect
         ? '모두 맞혔어요!'
         : '$_correctCount개 맞혔어요';
 
-    return SingleChildScrollView(
+    // 통계 행 구성 (null 조건부)
+    final stats = <(String, String)>[
+      ('📰', '뉴스 ${widget.newsCount}개 읽음'),
+      ('🧠', '퀴즈 $_correctCount개 맞힘'),
+      if (widget.glossaryCount > 0) ('📚', '용어 ${widget.glossaryCount}개'),
+      if (widget.streakCount > 0) ('🔥', '연속 ${widget.streakCount}일째 학습'),
+    ];
+
+    return KeyedSubtree(
       key: const ValueKey('result'),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 점수 디스플레이 (DESIGN.md display 34px w900)
-          Text(
-            '$_correctCount / $total',
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.2,
-              color: scoreColor,
+      child: AchievementSummary(
+        displayTitle: '$_correctCount / $total',
+        displayColor: allCorrect ? c.accent : textPrimary,
+        subtitle: copyLine,
+        subtitleColor: textPrimary,
+        statsLabel: '오늘 배운 것',
+        statRows: stats,
+        onClose: () => Navigator.pop(context),
+        secondaryAction: SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: _share,
+            icon: const Icon(Icons.ios_share_rounded, size: 16),
+            label: const Text(
+              '공유하기',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            copyLine,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-              color: textPrimary,
+            style: TextButton.styleFrom(
+              foregroundColor: c.accent,
             ),
-          ),
-          const SizedBox(height: 28),
-
-          // "오늘 배운 것" 카드 (radius xl=24)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(_kCardRadius),
-              border: isDark
-                  ? null
-                  : Border.all(
-                      color: _kAccent.withValues(alpha: 0.08)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '오늘 배운 것',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: textPrimary.withValues(alpha: 0.45),
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _statRow(
-                    '📰', '뉴스 ${widget.newsCount}개 읽음', textPrimary),
-                const SizedBox(height: 12),
-                _statRow(
-                    '🧠', '퀴즈 $_correctCount개 맞힘', textPrimary),
-                if (widget.glossaryCount > 0) ...[
-                  const SizedBox(height: 12),
-                  _statRow('📚',
-                      '용어 ${widget.glossaryCount}개', textPrimary),
-                ],
-                if (widget.streakCount > 0) ...[
-                  const SizedBox(height: 12),
-                  _statRow('🔥',
-                      '연속 ${widget.streakCount}일째 학습', textPrimary),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 마무리 텍스트
-          Center(
-            child: Text(
-              '내일 또 만나요',
-              style: TextStyle(
-                fontSize: 14,
-                color: textPrimary.withValues(alpha: 0.40),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // 닫기 (메인 CTA)
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: () => Navigator.pop(context),
-              style: FilledButton.styleFrom(
-                backgroundColor: _kAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(_kBtnRadius)),
-              ),
-              child: const Text(
-                '닫기',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 공유하기 (보조)
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              onPressed: _share,
-              icon: const Icon(Icons.ios_share_rounded, size: 16),
-              label: const Text(
-                '공유하기',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: _kAccent,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statRow(String emoji, String label, Color textPrimary) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 16)),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: textPrimary,
           ),
         ),
-      ],
+      ),
     );
   }
 }
