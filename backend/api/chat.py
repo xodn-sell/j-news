@@ -12,6 +12,7 @@ from lib.db import init_chat_db, increment_chat_usage
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
 
 DAILY_LIMIT = 30  # 유저당 하루 최대 채팅 횟수 (KST 날짜 기준)
 
@@ -199,15 +200,21 @@ class handler(BaseHTTPRequestHandler):
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=GEMINI_MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_INSTRUCTION,
                     temperature=0.8,
                     max_output_tokens=400,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
                 ),
             )
-            reply = (response.text or "").strip()
+            raw_reply = (response.text or "").strip()
+            if not raw_reply and response.candidates:
+                parts = response.candidates[0].content.parts if response.candidates[0].content else []
+                text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
+                raw_reply = "\n".join(text_parts).strip()
+            reply = raw_reply
             if not reply:
                 reply = "잠깐, 다시 한번 말해줄래?"
         except Exception as e:

@@ -10,6 +10,7 @@ from .db import save_news, get_today_news, update_dialogue
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
 
 SYSTEM_INSTRUCTION = """너는 뉴스 큐레이터이자 학습 콘텐츠 제작자다. 뉴스를 보고 싶지만 뭘 봐야 할지 모르는 한국 독자를 위해 오늘의 핵심 뉴스를 선별하고 쉽게 전달한다.
 절대 규칙:
@@ -230,15 +231,20 @@ def generate_dialogue(news_data: dict) -> list:
         prompt = DIALOGUE_PROMPT.format(news_json=news_json)
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=DIALOGUE_SYSTEM,
                 temperature=0.9,
                 max_output_tokens=4000,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
         raw = (response.text or "").strip()
+        if not raw and response.candidates:
+            parts = response.candidates[0].content.parts if response.candidates[0].content else []
+            text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
+            raw = "\n".join(text_parts).strip()
         if not raw:
             return []
         # JSON 추출
@@ -297,14 +303,20 @@ def fetch_and_store(region: str = "world", category: str = "general"):
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=GEMINI_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
             system_instruction=SYSTEM_INSTRUCTION,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
+    # response.text가 None인 경우 parts에서 직접 텍스트 추출
     raw = response.text or ""
+    if not raw and response.candidates:
+        parts = response.candidates[0].content.parts if response.candidates[0].content else []
+        text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
+        raw = "\n".join(text_parts)
 
     data = extract_json(raw)
     if "items" not in data:
