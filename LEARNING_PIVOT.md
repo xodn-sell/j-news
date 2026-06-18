@@ -70,3 +70,48 @@
 ## 작업 운용
 - 구현 작업 = **sonnet 에이전트**(flutter-dev / backend-dev) 분담.
 - 총괄·계획·통합·리뷰 = **opus**(메인).
+
+---
+
+# v2.1 — 개념 리터러시 레이어 (구축·배포 완료, 2026-06-18)
+
+> 학습 축 확정: **"시사 배경지식 리터러시"**. 측정 불가 약점은 **개념/엔티티 추적**으로 보완.
+> 로컬 SRS(review_service)는 유지, 서버사이드 개념 레이어를 additive로 얹음.
+
+## 핵심 결정
+- **학습 단위 = 정규화 개념**(인물·기관·사건·지명·용어). glossary 시드 + Gemini 엔티티 추출.
+- **측정**: 수동 노출(stage 0 카운트) = "만난 개념", 능동 퀴즈(Leitner 1~5) = "습득". 원칙 "측정 수동, 테스트 옵션".
+- **서버사이드 필수 이유**: 2단계 A/B 코호트 리텐션은 device-local로 측정 불가.
+- canonicalization = LLM(slug 직접 반환), slug UNIQUE로 dedup.
+
+## 데이터모델 (`backend/lib/concepts_db.py`)
+- `concepts`: slug UNIQUE, kind, domain, definition, occurrence_count
+- `concept_occurrences`: concept↔news 등장 (노출 코퍼스), (concept_id,news_id,title) UNIQUE
+- `user_concept_mastery`: PK(user_id,concept_id), srs_stage 0~5, next_review_date, mastered
+
+## 루프 배선 (구축 완료)
+```
+cron 추출(1콜: concepts+quiz_links) → upsert + occurrence + quiz에 concept_ids 주입(summary 재저장)
+  → news.py 페이로드 concepts[] (fail-soft)
+  → 앱 카드노출 = exposure(패시브) / 완독 = getProgress → 진척 viz(완독보너스 자리)
+  → 퀴즈 정답확인 = record_review(개념별 Leitner 승급/리셋)
+```
+- 엔드포인트: `POST /api/concepts`(exposure/review), `GET /api/concepts?uid=`(progress)
+- 소급태깅: `GET /api/admin?action=backfill_concepts&limit=N` (멱등), `action=concepts_stats`
+- 신규 파일: `concepts_db.py`, `api/concepts.py`, `concept_service.dart`, `widgets/concept_progress_card.dart`
+
+## 배포 상태 (2026-06-18)
+- ✅ 백엔드 prod (`backend-ruby-chi-85.vercel.app`), news concepts[] 노출, 엔드포인트 검증
+- ✅ 릴리즈 APK 빌드 (`app-release.apk`, 54.3MB) — Play Console 업로드 미실행
+- ✅ 커밋·푸시 (`ec90276`)
+- ⏳ **백필 미실행** (ADMIN_SECRET_KEY 필요 + 뉴스당 Gemini 1콜 비용 → 규모 확인 후 go)
+
+## 2단계 — A/B 리텐션 검증 (다음, 미착수)
+**목적**: 진척 viz가 완독보너스(+3pt) 습관을 대체하는가. 통과 못하면 포인트 제거 중단.
+**검증 설계 (confound 방어)**:
+- A군: viz + 완독보너스 유지 / B군: viz only (완독보너스 제거)
+- B 리텐션 ≈ A → viz가 습관 짊어짐 (게이트 통과). B 하락 → 멈춤.
+- 코호트: uid 해시 50/50 결정적 분배 (서버·앱 합의)
+- **게이트 지표 (사전 못박기)**: D7/D14 세션 복귀율, 2주 코호트 최소. 뉴스 3세션/일 → "세션 복귀"가 신호.
+- 가드레일: B군 완독률 -20%면 즉시 롤백.
+**미결 (착수 전 확인)**: 코호트 비율, 측정 기간, 완독보너스 off를 라이브 유저에 적용하는 시점.
