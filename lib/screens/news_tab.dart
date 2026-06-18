@@ -19,6 +19,8 @@ import 'audio_briefing_screen.dart';
 import 'quiz_screen.dart';
 import '../services/quiz_service.dart';
 import '../services/concept_service.dart';
+import '../services/ab_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/concept_progress_card.dart';
 import '../theme/jnews_colors.dart';
 
@@ -123,7 +125,19 @@ class _NewsTabState extends State<NewsTab>
     );
     _initSwipeHint();
     NativeAdService.preload(); // 광고 슬롯 도달 전 미리 로드
+    _setAbCohortProperty();
     if (widget.autoLoad) _fetchNews();
+  }
+
+  static bool _cohortPropSet = false;
+
+  /// A/B 코호트를 Firebase user property로 1회 설정 (리텐션 세그먼트용).
+  void _setAbCohortProperty() {
+    if (_cohortPropSet) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _cohortPropSet = true;
+    _analytics.setUserProperty(name: 'ab_cohort', value: AbService.cohort(uid));
   }
 
   Future<void> _initSwipeHint() async {
@@ -328,6 +342,7 @@ class _NewsTabState extends State<NewsTab>
     _analytics.logEvent(name: 'news_complete', parameters: {
       'region': widget.region,
       'total_cards': _totalCards,
+      'ab_cohort': AbService.cohort(AuthService.uid),
     });
     final streak = await StreakService.recordCompletion();
     if (!mounted) return;
@@ -834,8 +849,10 @@ class _NewsTabState extends State<NewsTab>
           ),
           const SizedBox(height: 32),
 
-          // 학습 진척 카드 — 완독보너스 자리. 누적 배경지식 자산 viz.
-          if (_progress != null && !_progress!.isEmpty) ...[
+          // 학습 진척 카드 — A/B: A군(viz on)만 노출. B군은 대조(viz 추가 전 동작).
+          if (AbService.vizEnabled(AuthService.uid) &&
+              _progress != null &&
+              !_progress!.isEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: ConceptProgressCard(
