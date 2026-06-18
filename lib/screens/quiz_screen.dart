@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart' as share_plus;
 import '../models/news_result.dart';
 import '../services/quiz_service.dart';
 import '../services/review_service.dart';
+import '../services/concept_service.dart';
 import '../theme/jnews_colors.dart';
 import '../widgets/achievement_summary.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -103,6 +104,10 @@ class _QuizScreenState extends State<QuizScreen>
     );
     // 푼 문제를 SRS 복습 카드로 등록 (stage 1 → 내일 due)
     await ReviewService.addCard(q, articleTitle);
+    // 정밀 개념 SRS — 문항이 묻는 개념을 서버에 승급/리셋 (fire-and-forget)
+    for (final cid in q.conceptIds) {
+      ConceptService.recordReview(cid, isCorrect);
+    }
     _analytics.logEvent(name: 'quiz_attempted', parameters: {
       'question_index': _qIndex,
       'correct': isCorrect,

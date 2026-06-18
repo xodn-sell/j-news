@@ -115,6 +115,21 @@ def save_news(region: str, category: str, summary: str, sources: str, dialogue: 
         conn.close()
 
 
+def update_summary(news_id: int, summary: str):
+    """기존 뉴스 row의 summary 교체 (개념 추출 후 quiz에 concept_ids 주입용)."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE news SET summary = %s WHERE id = %s",
+            (summary, news_id),
+        )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
 def update_dialogue(news_id: int, dialogue: str):
     """기존 뉴스 row에 dialogue를 나중에 추가/교체."""
     conn = get_conn()

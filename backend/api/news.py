@@ -165,6 +165,14 @@ class handler(BaseHTTPRequestHandler):
         payload["insight"] = parsed_summary.get("insight", "")
         payload["dialogue"] = _safe_json(row.get("dialogue"), fallback=[])
 
+        # 학습 개념(있으면) — 앱이 카드 노출/퀴즈 시 concept_id 기록용.
+        # 개념 레이어 미구축/장애여도 뉴스 응답엔 영향 없게 fail-soft.
+        try:
+            from lib.concepts_db import get_concepts_for_news
+            payload["concepts"] = get_concepts_for_news(row["id"])
+        except Exception:
+            payload["concepts"] = []
+
         self._json_response(200, payload)
 
     def do_OPTIONS(self):

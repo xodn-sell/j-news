@@ -18,6 +18,8 @@ import 'chat_sheet.dart';
 import 'audio_briefing_screen.dart';
 import 'quiz_screen.dart';
 import '../services/quiz_service.dart';
+import '../services/concept_service.dart';
+import '../widgets/concept_progress_card.dart';
 import '../theme/jnews_colors.dart';
 
 // ── 토스 디자인 상수 ──
@@ -64,6 +66,10 @@ class _NewsTabState extends State<NewsTab>
   // ── 카드 스택 상태 ──
   int _currentIndex = 0;
   bool _showComplete = false;
+
+  // ── 개념 학습 ──
+  ConceptProgress? _progress; // 완독 화면 viz용
+  final Set<int> _exposedConceptIds = {}; // 이번 세션 노출 기록 dedupe
 
   // ── 스와이프 힌트 ──
   bool _showSwipeHint = false;
@@ -160,6 +166,16 @@ class _NewsTabState extends State<NewsTab>
       'index': newsIdx,
       'duration_seconds': elapsed.inSeconds,
     });
+    _recordConceptExposure(item.title);
+  }
+
+  /// 기사 노출 시 해당 기사 개념을 패시브 기록(세션 내 중복 제외, fire-and-forget).
+  void _recordConceptExposure(String articleTitle) {
+    final ids = _result?.conceptIdsByTitle[articleTitle];
+    if (ids == null || ids.isEmpty) return;
+    final fresh = ids.where(_exposedConceptIds.add).toList();
+    if (fresh.isEmpty) return;
+    ConceptService.recordExposure(fresh); // await 안 함 — UI 비차단
   }
 
   @override
@@ -185,6 +201,8 @@ class _NewsTabState extends State<NewsTab>
   Future<void> _fetchNews() async {
     if (_isLoading) return;
     setState(() { _isLoading = true; _error = null; _isOfflineData = false; _showComplete = false; });
+    _exposedConceptIds.clear();
+    _progress = null;
     final fetchStart = DateTime.now();
     _analytics.logEvent(name: 'news_load_start', parameters: {
       'region': widget.region,
@@ -318,6 +336,10 @@ class _NewsTabState extends State<NewsTab>
       _showComplete = true;
     });
     _completeController.forward(from: 0.0);
+
+    // 진척 조회 — viz 갱신(실패해도 완독 화면엔 영향 없음)
+    final prog = await ConceptService.getProgress();
+    if (mounted && prog != null) setState(() => _progress = prog);
   }
 
   Future<void> _goNext() async {
@@ -811,6 +833,18 @@ class _NewsTabState extends State<NewsTab>
             ],
           ),
           const SizedBox(height: 32),
+
+          // 학습 진척 카드 — 완독보너스 자리. 누적 배경지식 자산 viz.
+          if (_progress != null && !_progress!.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: ConceptProgressCard(
+                progress: _progress!,
+                newThisSession: _exposedConceptIds.length,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // 퀴즈 CTA — 문항이 있을 때만 표시 (메인 강조)
           Builder(builder: (ctx) {

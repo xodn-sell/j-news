@@ -68,6 +68,38 @@ class handler(BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    def _get_concepts_stats(self):
+        """백필 진척·코퍼스 현황 확인용."""
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM concepts")
+            total_concepts = int(cur.fetchone()[0])
+            cur.execute("SELECT COUNT(*) FROM concept_occurrences")
+            total_occurrences = int(cur.fetchone()[0])
+            cur.execute("SELECT COUNT(*) FROM news")
+            total_news = int(cur.fetchone()[0])
+            cur.execute(
+                "SELECT COUNT(DISTINCT news_id) FROM concept_occurrences"
+            )
+            tagged_news = int(cur.fetchone()[0])
+            cur.execute(
+                "SELECT domain, COUNT(*) FROM concepts GROUP BY domain "
+                "ORDER BY COUNT(*) DESC"
+            )
+            by_domain = {d: int(c) for d, c in cur.fetchall()}
+            cur.close()
+            return {
+                "total_concepts": total_concepts,
+                "total_occurrences": total_occurrences,
+                "total_news": total_news,
+                "tagged_news": tagged_news,
+                "untagged_news": total_news - tagged_news,
+                "by_domain": by_domain,
+            }
+        finally:
+            conn.close()
+
     def _get_users(self):
         conn = get_conn()
         try:
@@ -241,6 +273,24 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json_response(500, {"detail": str(e)})
 
+        elif action == "concepts_stats":
+            try:
+                self._json_response(200, self._get_concepts_stats())
+            except Exception as e:
+                self._json_response(500, {"detail": str(e)})
+
+        elif action == "backfill_concepts":
+            limit_raw = params.get("limit", ["5"])[0]
+            try:
+                limit = max(1, min(20, int(limit_raw)))
+            except ValueError:
+                limit = 5
+            try:
+                from lib.gemini import backfill_concepts
+                self._json_response(200, backfill_concepts(limit))
+            except Exception as e:
+                self._json_response(500, {"detail": str(e)})
+
         elif action == "export":
             export_type = params.get("type", [None])[0]
             columns_raw = params.get("columns", [""])[0]
@@ -256,7 +306,7 @@ class handler(BaseHTTPRequestHandler):
                 self._json_response(500, {"detail": str(e)})
 
         else:
-            self._json_response(400, {"detail": "action must be one of: stats, users, reviews, export"})
+            self._json_response(400, {"detail": "action must be one of: stats, users, reviews, export, concepts_stats, backfill_concepts"})
 
     def do_OPTIONS(self):
         self.send_response(200)

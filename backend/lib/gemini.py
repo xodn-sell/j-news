@@ -6,7 +6,8 @@ from urllib.request import Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 from google.genai import types
-from .db import save_news, get_today_news, update_dialogue
+from .db import save_news, get_today_news, update_dialogue, update_summary, get_conn
+from .concepts_db import init_concepts_db, upsert_concept, add_occurrence
 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -275,6 +276,271 @@ def generate_dialogue(news_data: dict) -> list:
         return []
 
 
+CONCEPT_SYSTEM = """너는 시사 배경지식 큐레이터다. 뉴스에서 독자가 '알아두면 다음 뉴스 이해가 쉬워지는' 핵심 개념을 골라 정규화한다.
+
+개념 = 인물(person) / 기관·단체(org) / 사건·정책(event) / 지명·국가(place) / 용어(term).
+
+절대 규칙:
+- 인사말·서론·부연 금지. 유효한 JSON 배열만 출력.
+- 한국어로 작성.
+- slug: 개념의 영구 식별자. 소문자 영문 kebab-case (예: "g7-summit", "interest-rate", "kim-jong-un"). 같은 개념은 표면형이 달라도 반드시 같은 slug.
+- 일회성·지엽적 고유명사 제외. 반복 등장하거나 배경지식 가치 있는 것만.
+- 너무 일반적인 단어(예: 정부, 사람, 오늘) 제외.
+- 제공된 glossary 용어는 우선 포함하되 같은 정규화 규칙 적용.
+- definition: 1~2문장, 뉴스 없이도 이해되는 독립 설명."""
+
+CONCEPT_PROMPT = """아래 오늘의 뉴스에서 핵심 개념을 추출해 정규화하고, 각 퀴즈 문항이 어떤 개념을 묻는지 연결해.
+
+[뉴스 데이터]
+{news_json}
+
+반드시 아래 JSON 객체 형식으로만 출력:
+{{
+  "concepts": [
+    {{
+      "slug": "g7-summit",
+      "display_name": "G7 정상회의",
+      "kind": "event",
+      "domain": "foreign",
+      "definition": "주요 7개국 정상이 모여 국제 현안을 논의하는 연례 회의.",
+      "articles": ["이 개념이 등장한 기사 제목 (items[].title과 정확히 일치)"]
+    }}
+  ],
+  "quiz_links": [
+    {{"article_title": "기사 제목(items[].title과 일치)", "quiz_index": 0, "concept_slug": "g7-summit"}}
+  ]
+}}
+
+규칙:
+- kind: person / org / event / place / term 중 하나
+- domain: politics / economy / society / tech / foreign / etc 중 하나
+- articles: 반드시 입력 items의 title과 글자까지 일치. 매칭 안 되면 그 개념 제외.
+- concepts 전체 8~16개. 기사당 1~3개 수준.
+- quiz_links: 각 기사의 quiz 배열 순서대로 quiz_index(0부터). 그 문항이 핵심으로 묻는 개념 1개의 slug를 concepts에 있는 slug 중에서 지정. 적절한 개념 없으면 그 문항은 생략.
+- JSON 외 다른 텍스트 출력 금지"""
+
+
+def _session_key(now=None) -> str:
+    """KST 시간 → {YYYY-MM-DD}_{morning|noon|evening}. client PointBalance 규칙과 동일.
+    00:00~06:59 새벽은 전일 evening 연장."""
+    KST = timezone(timedelta(hours=9))
+    now = now or datetime.now(KST)
+    h = now.hour
+    if 7 <= h < 12:
+        return f"{now.strftime('%Y-%m-%d')}_morning"
+    if 12 <= h < 18:
+        return f"{now.strftime('%Y-%m-%d')}_noon"
+    if 18 <= h < 24:
+        return f"{now.strftime('%Y-%m-%d')}_evening"
+    prev = now - timedelta(days=1)
+    return f"{prev.strftime('%Y-%m-%d')}_evening"
+
+
+def _slugify(text: str) -> str:
+    """LLM이 slug를 빠뜨렸을 때 fallback. 영문/숫자만 kebab, 없으면 원문 압축."""
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return s or re.sub(r"\s+", "-", (text or "").strip())
+
+
+def _extract_concepts(news_data: dict) -> dict:
+    """뉴스 데이터로 개념 + 퀴즈-개념 링크 생성.
+    반환: {"concepts": [...], "quiz_links": [...]}. 실패 시 빈 dict(cron 안 죽임)."""
+    try:
+        # glossary·quiz가 프롬프트에 포함되도록 items만 슬림하게 전달.
+        # quiz는 quiz_index 참조용으로 question 텍스트만 순서대로.
+        slim = {
+            "items": [
+                {
+                    "title": it.get("title", ""),
+                    "body": it.get("body", ""),
+                    "why_matters": it.get("why_matters", ""),
+                    "glossary": it.get("glossary", []),
+                    "quiz": [
+                        {"quiz_index": qi, "question": (q or {}).get("question", "")}
+                        for qi, q in enumerate(it.get("quiz", []) or [])
+                    ],
+                }
+                for it in news_data.get("items", [])
+            ]
+        }
+        prompt = CONCEPT_PROMPT.format(
+            news_json=json.dumps(slim, ensure_ascii=False)
+        )
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=CONCEPT_SYSTEM,
+                temperature=0.2,
+                max_output_tokens=4000,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
+        raw = (response.text or "").strip()
+        if not raw and response.candidates:
+            parts = response.candidates[0].content.parts if response.candidates[0].content else []
+            raw = "\n".join(p.text for p in parts if hasattr(p, "text") and p.text).strip()
+        if not raw:
+            return {}
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            match = re.search(r"\{[\s\S]*\}", raw)
+            if not match:
+                return {}
+            parsed = json.loads(match.group(0))
+        if not isinstance(parsed, dict):
+            return {}
+        return parsed
+    except Exception as e:
+        print(f"  개념 추출 실패: {e}")
+        return {}
+
+
+def extract_and_store_concepts(news_data: dict, news_id: int):
+    """뉴스에서 개념 추출 → concepts upsert + concept_occurrences 기록 +
+    quiz 문항에 concept_ids 주입 후 summary 재저장.
+    fetch_and_store 끝에서 호출. 실패해도 뉴스/대화 저장에 영향 없음."""
+    init_concepts_db()
+    extracted = _extract_concepts(news_data)
+    concepts = extracted.get("concepts") or []
+    quiz_links = extracted.get("quiz_links") or []
+    if not concepts:
+        print("  개념 0건 — 추출 스킵")
+        return
+
+    # 기사 제목 → 매칭 검증용
+    valid_titles = {
+        it.get("title", "").strip()
+        for it in news_data.get("items", [])
+        if it.get("title")
+    }
+    session_key = _session_key()
+    slug_to_id = {}  # quiz_links 주입 시 slug → concept_id 조회용
+    stored = 0
+    for c in concepts:
+        if not isinstance(c, dict):
+            continue
+        display = (c.get("display_name") or "").strip()
+        if not display:
+            continue
+        slug = (c.get("slug") or "").strip() or _slugify(display)
+        try:
+            concept_id = upsert_concept(
+                slug=slug,
+                display_name=display,
+                kind=(c.get("kind") or "term").strip(),
+                domain=(c.get("domain") or "etc").strip(),
+                definition=(c.get("definition") or "").strip(),
+            )
+        except Exception as e:
+            print(f"  개념 upsert 실패 [{slug}]: {e}")
+            continue
+        slug_to_id[slug] = concept_id
+        articles = c.get("articles") or []
+        matched = [t.strip() for t in articles if t.strip() in valid_titles]
+        # 매칭 0이면 뉴스 전체에 1건이라도 귀속(노출 코퍼스 손실 방지)
+        if not matched and valid_titles:
+            matched = [next(iter(valid_titles))]
+        for title in matched:
+            try:
+                if add_occurrence(concept_id, news_id, title, session_key):
+                    stored += 1
+            except Exception as e:
+                print(f"  occurrence 실패 [{slug}/{title[:20]}]: {e}")
+
+    # quiz_links → 해당 quiz 문항에 concept_ids 주입 (위치 기반, 문자열 매칭 없음)
+    title_to_item = {
+        it.get("title", "").strip(): it
+        for it in news_data.get("items", [])
+        if it.get("title")
+    }
+    injected = 0
+    for link in quiz_links:
+        if not isinstance(link, dict):
+            continue
+        cid = slug_to_id.get((link.get("concept_slug") or "").strip())
+        item = title_to_item.get((link.get("article_title") or "").strip())
+        if cid is None or item is None:
+            continue
+        try:
+            qi = int(link.get("quiz_index"))
+        except (TypeError, ValueError):
+            continue
+        quiz = item.get("quiz") or []
+        if not (0 <= qi < len(quiz)) or not isinstance(quiz[qi], dict):
+            continue
+        ids = quiz[qi].get("concept_ids") or []
+        if cid not in ids:
+            ids.append(cid)
+            quiz[qi]["concept_ids"] = ids
+            injected += 1
+
+    # concept_ids가 하나라도 주입됐으면 summary 재저장
+    if injected:
+        try:
+            update_summary(news_id, json.dumps(news_data, ensure_ascii=False))
+        except Exception as e:
+            print(f"  summary 재저장 실패: {e}")
+    print(f"  개념 {len(concepts)}건, occurrence {stored}건, quiz링크 {injected}건 저장")
+
+
+def backfill_concepts(limit: int = 5) -> dict:
+    """concept_occurrences 없는 기존 news row만 골라 개념 추출 백필 (콜드스타트 코퍼스).
+
+    Vercel 타임아웃 회피: 호출당 limit건만 처리. 멱등 — 이미 처리된 news_id는
+    NOT IN으로 제외되므로 안전하게 반복 호출 가능.
+    파싱 불가/items 없는 row는 occurrence가 안 생겨 영구히 남으므로,
+    caller는 processed==0이면 루프 종료해야 함(remaining>0이어도)."""
+    init_concepts_db()
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, summary FROM news
+            WHERE id NOT IN (SELECT DISTINCT news_id FROM concept_occurrences)
+            ORDER BY id DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+        cur.execute(
+            "SELECT COUNT(*) FROM news "
+            "WHERE id NOT IN (SELECT DISTINCT news_id FROM concept_occurrences)"
+        )
+        remaining_before = cur.fetchone()[0]
+        cur.close()
+    finally:
+        conn.close()
+
+    processed, skipped = 0, 0
+    for news_id, summary in rows:
+        try:
+            data = json.loads(summary) if isinstance(summary, str) else summary
+        except Exception:
+            data = None
+        if not isinstance(data, dict) or not data.get("items"):
+            skipped += 1
+            continue
+        try:
+            extract_and_store_concepts(data, news_id)
+            processed += 1
+        except Exception as e:
+            print(f"  백필 실패 [news_id={news_id}]: {e}")
+            skipped += 1
+    return {
+        "processed": processed,
+        "skipped": skipped,
+        "remaining": max(0, remaining_before - processed),
+    }
+
+
 def fetch_and_store(region: str = "world", category: str = "general"):
     """Gemini로 뉴스 요약을 생성하고 DB에 저장"""
     KST = timezone(timedelta(hours=9))
@@ -355,16 +621,24 @@ def fetch_and_store(region: str = "world", category: str = "general"):
     save_news(region, category, summary, sources, None)
     print(f"[{datetime.now(KST)}] {region} [{category}] 뉴스 저장 완료 ({len(data['items'])}건)")
 
+    # 방금 저장한 row id 확보 (dialogue·concept 둘 다 사용)
+    from .db import get_latest_news
+    latest = get_latest_news(region, category)
+    news_id = latest.get("id") if latest else None
+
     # 2) dialogue 생성 후 같은 row를 update
     #    별도 try로 감싸서 dialogue 실패가 cron 전체를 죽이지 않게 함
     try:
         dialogue_list = generate_dialogue(data)
-        if dialogue_list:
-            # 방금 저장한 row를 찾아 update (region+category의 최신)
-            from .db import get_latest_news
-            latest = get_latest_news(region, category)
-            if latest and latest.get("id"):
-                update_dialogue(latest["id"], json.dumps(dialogue_list, ensure_ascii=False))
-                print(f"  대화 {len(dialogue_list)}턴 저장 완료")
+        if dialogue_list and news_id:
+            update_dialogue(news_id, json.dumps(dialogue_list, ensure_ascii=False))
+            print(f"  대화 {len(dialogue_list)}턴 저장 완료")
     except Exception as e:
         print(f"  dialogue 생성/저장 스킵: {e}")
+
+    # 3) 개념 추출 → 학습 코퍼스 적재 (별도 try, 실패해도 무해)
+    try:
+        if news_id:
+            extract_and_store_concepts(data, news_id)
+    except Exception as e:
+        print(f"  개념 추출/저장 스킵: {e}")

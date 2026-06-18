@@ -6,6 +6,7 @@ class QuizQuestion {
   final List<String> options;
   final int answerIndex;
   final String explanation;
+  final List<int> conceptIds; // 이 문항이 묻는 개념 id (정밀 SRS 승급용)
 
   const QuizQuestion({
     required this.question,
@@ -13,6 +14,7 @@ class QuizQuestion {
     required this.options,
     required this.answerIndex,
     required this.explanation,
+    this.conceptIds = const [],
   });
 
   factory QuizQuestion.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,10 @@ class QuizQuestion {
       options: opts,
       answerIndex: safeIdx,
       explanation: (json['explanation'] as String?) ?? '',
+      conceptIds: (json['concept_ids'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const [],
     );
   }
 }
@@ -216,18 +222,64 @@ class DialogueTurn {
   }
 }
 
+/// 학습 개념 — 뉴스에 등장한 정규화된 시사 배경지식 단위.
+/// articleTitle로 어느 기사에 속하는지 매핑(노출 기록용).
+class Concept {
+  final int id;
+  final String slug;
+  final String displayName;
+  final String kind; // person|org|event|place|term
+  final String domain; // politics|economy|society|tech|foreign|etc
+  final String definition;
+  final String articleTitle;
+
+  const Concept({
+    required this.id,
+    required this.slug,
+    required this.displayName,
+    required this.kind,
+    required this.domain,
+    required this.definition,
+    required this.articleTitle,
+  });
+
+  factory Concept.fromJson(Map<String, dynamic> json) {
+    return Concept(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      slug: json['slug'] ?? '',
+      displayName: json['display_name'] ?? '',
+      kind: json['kind'] ?? 'term',
+      domain: json['domain'] ?? 'etc',
+      definition: json['definition'] ?? '',
+      articleTitle: json['article_title'] ?? '',
+    );
+  }
+}
+
 class NewsResult {
   final List<NewsItem> items;
   final InsightData insight;
   final String? updatedAt;
   final List<DialogueTurn> dialogue;
+  final List<Concept> concepts;
 
   NewsResult({
     required this.items,
     required this.insight,
     this.updatedAt,
     this.dialogue = const [],
+    this.concepts = const [],
   });
+
+  /// 기사 제목 → 해당 기사 개념 id 목록 (노출 기록용 매핑).
+  Map<String, List<int>> get conceptIdsByTitle {
+    final map = <String, List<int>>{};
+    for (final c in concepts) {
+      if (c.articleTitle.isEmpty || c.id == 0) continue;
+      map.putIfAbsent(c.articleTitle, () => []).add(c.id);
+    }
+    return map;
+  }
 
   factory NewsResult.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> data = _normalizePayload(json);
@@ -241,6 +293,16 @@ class NewsResult {
             .toList()
         : const [];
 
+    // concepts는 페이로드 최상위(summary 밖). 없으면 빈 리스트.
+    final conceptsRaw = json['concepts'];
+    final List<Concept> concepts = (conceptsRaw is List)
+        ? conceptsRaw
+            .whereType<Map<String, dynamic>>()
+            .map(Concept.fromJson)
+            .where((c) => c.id != 0)
+            .toList()
+        : const [];
+
     return NewsResult(
       items: (data['items'] as List<dynamic>?)
               ?.map((i) => NewsItem.fromJson(i as Map<String, dynamic>))
@@ -249,6 +311,7 @@ class NewsResult {
       insight: InsightData.fromJson(data['insight'] ?? json['insight']),
       updatedAt: json['updated_at'],
       dialogue: dialogue,
+      concepts: concepts,
     );
   }
 

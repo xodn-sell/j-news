@@ -10,6 +10,7 @@
     { "src": "/api/cron", "dest": "/api/cron.py" },
 { "src": "/api/admin", "dest": "/api/admin.py" },
     { "src": "/api/chat", "dest": "/api/chat.py" },
+    { "src": "/api/concepts", "dest": "/api/concepts.py" },
     { "src": "/admin", "dest": "/admin.html" },
     { "src": "/icon.png", "dest": "/public/icon.png" },
     { "src": "/app-ads.txt", "dest": "/public/app-ads.txt" },
