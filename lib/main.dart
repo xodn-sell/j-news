@@ -85,6 +85,23 @@ void main() async {
     }
   }
 
+  // 복귀 유저(온보딩 완료)인데 알림 권한 없으면 1회 재요청.
+  // (재설치/온보딩 스킵 시 권한이 영구 미요청되던 갭 보정.
+  //  신규 유저는 onboarding opt-in 체크박스 흐름이 처리하므로 여기서 안 건드림.
+  //  영구 거부 상태면 OS가 다이얼로그를 억제하므로 스팸 안 됨.)
+  if (onboardingDone) {
+    try {
+      final status = await NotificationService.getPermissionStatus();
+      if (status['notification'] != true) {
+        final granted = await NotificationService.requestPermissions();
+        if (granted) await NotificationService.scheduleDailyNews();
+        analytics.logEvent(name: 'notif_permission_rerequest', parameters: {
+          'granted': granted ? 1 : 0,
+        });
+      }
+    } catch (_) {}
+  }
+
   themeModeNotifier.value = _parseThemeMode(themeModeStr);
 
   final bootDurationMs = DateTime.now().difference(bootStart).inMilliseconds;
