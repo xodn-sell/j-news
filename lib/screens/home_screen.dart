@@ -292,10 +292,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
 
-            // ── SRS 복습 배너 (due > 0 일 때만 노출) ──
-            if (_reviewDueCount > 0)
-              _ReviewBanner(dueCount: _reviewDueCount, onTap: _openReview),
-
             // 뉴스 콘텐츠
             Expanded(
               child: NewsTab(
@@ -305,6 +301,12 @@ class _HomeScreenState extends State<HomeScreen>
                 onPageChanged: _onPageChanged,
               ),
             ),
+
+            // ── SRS 복습 배너 (due > 0, 맨 아래) — 단 AI 심층분석(마지막 카드)에선 숨김 ──
+            if (_reviewDueCount > 0 &&
+                _totalPages > 0 &&
+                _currentPage < _totalPages - 1)
+              _ReviewBanner(dueCount: _reviewDueCount, onTap: _openReview),
           ],
         ),
       ),
@@ -398,7 +400,7 @@ class _ReviewBanner extends StatelessWidget {
       button: true,
       label: '오늘 복습할 카드 $dueCount개. 복습 시작하기',
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Material(
           color: isDark ? c.accent.withValues(alpha: 0.14) : c.surfaceTint,
           borderRadius: BorderRadius.circular(16),

@@ -366,14 +366,17 @@ class _QuizScreenState extends State<QuizScreen>
           ),
           const SizedBox(height: 16),
 
-          // 선택지
-          ...List.generate(q.options.length, (i) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildChoice(
-                  i, q.options[i], q.answerIndex, isDark, textPrimary, c),
-            );
-          }),
+          // 선택지 — OX는 전용 좌우 O/X 선택 UI, 4지선다는 세로 리스트
+          if (q.type == 'ox')
+            _buildOxSelector(q, isDark, textPrimary, c)
+          else
+            ...List.generate(q.options.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildChoice(
+                    i, q.options[i], q.answerIndex, isDark, textPrimary, c),
+              );
+            }),
 
           const SizedBox(height: 8),
 
@@ -473,6 +476,74 @@ class _QuizScreenState extends State<QuizScreen>
             ),
             if (trailingIcon != null) trailingIcon,
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── OX 전용 선택 UI — 좌우 큰 O / X 버튼 ──
+  Widget _buildOxSelector(
+      QuizQuestion q, bool isDark, Color textPrimary, JNewsColors c) {
+    // 데이터 옵션 순서(보통 ['O','X'])대로 idx 매핑. idx0=O, idx1=X.
+    return Row(
+      children: [
+        Expanded(child: _buildOxTile(0, true, q, isDark, textPrimary, c)),
+        const SizedBox(width: 12),
+        Expanded(child: _buildOxTile(1, false, q, isDark, textPrimary, c)),
+      ],
+    );
+  }
+
+  Widget _buildOxTile(int idx, bool isO, QuizQuestion q, bool isDark,
+      Color textPrimary, JNewsColors c) {
+    if (idx >= q.options.length) return const SizedBox.shrink();
+    final isSelected = _selectedOption == idx;
+    final isAnswer = idx == q.answerIndex;
+
+    Color borderColor;
+    Color bgColor;
+    Color symbolColor;
+
+    if (_revealed) {
+      if (isAnswer) {
+        borderColor = c.success;
+        bgColor = c.success.withValues(alpha: 0.10);
+        symbolColor = c.success;
+      } else if (isSelected) {
+        borderColor = c.error;
+        bgColor = c.error.withValues(alpha: 0.10);
+        symbolColor = c.error;
+      } else {
+        borderColor = Colors.transparent;
+        bgColor = isDark ? Colors.white.withValues(alpha: 0.05) : c.surfaceAlt;
+        symbolColor = textPrimary.withValues(alpha: 0.30);
+      }
+    } else if (isSelected) {
+      borderColor = c.accent;
+      bgColor = c.accent.withValues(alpha: 0.08);
+      symbolColor = c.accent;
+    } else {
+      borderColor = Colors.transparent;
+      bgColor = isDark ? Colors.white.withValues(alpha: 0.05) : c.surfaceAlt;
+      symbolColor = textPrimary.withValues(alpha: 0.55);
+    }
+
+    return GestureDetector(
+      onTap: () => _selectOption(idx),
+      child: AnimatedContainer(
+        duration: _kFeedbackDuration,
+        height: 120,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(_kChoiceRadius),
+          border: Border.all(color: borderColor, width: 2),
+        ),
+        child: Center(
+          child: Icon(
+            isO ? Icons.radio_button_unchecked_rounded : Icons.close_rounded,
+            size: 52,
+            color: symbolColor,
+          ),
         ),
       ),
     );
