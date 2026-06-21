@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart' as share_plus;
@@ -34,7 +36,6 @@ const _kCardRadius = 24.0;
 Color _onSurfaceAlpha(BuildContext context, double a) =>
     Theme.of(context).colorScheme.onSurface.withValues(alpha: a);
 Color _primaryAlpha(double a) => _kPrimary.withValues(alpha: a);
-
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  NewsTab
@@ -88,21 +89,23 @@ class _NewsTabState extends State<NewsTab>
   late AnimationController _swipeController;
   late AnimationController _enterController;
   double _dragX = 0;
-  int _swipeDirection = 0;   // -1 = 왼쪽(다음), 1 = 오른쪽(이전)
+  int _swipeDirection = 0; // -1 = 왼쪽(다음), 1 = 오른쪽(이전)
 
   // ── 완독 화면 애니메이션 ──
   late AnimationController _completeController;
 
-  static const _swipeThreshold = 60.0;
+  static const _swipeThresholdRatio = 0.22;
+  static const _swipeMinThreshold = 72.0;
+  static const _swipeMaxThreshold = 104.0;
   // 빠른 swipe 감지: 화면 너비의 50% 이상 / 초 (대략 600~800px/s)
   static const _swipeVelocityThreshold = 800.0;
   // exit: 빠르게 + 짧게 (토스 느낌)
   static const _swipeDuration = Duration(milliseconds: 360);
-  static const _snapBackDuration = Duration(milliseconds: 240);
+  static const _snapBackDuration = Duration(milliseconds: 220);
   // ease-out cubic — 시작 빠르고 끝 부드러움
   static const _swipeCurve = Cubic(0.22, 1, 0.36, 1);
   // snap-back: out-back으로 살짝 출렁
-  static const _snapCurve = Cubic(0.34, 1.56, 0.64, 1);
+  static const _snapCurve = Curves.easeOutCubic;
 
   @override
   bool get wantKeepAlive => true;
@@ -110,7 +113,10 @@ class _NewsTabState extends State<NewsTab>
   @override
   void initState() {
     super.initState();
-    _swipeController = AnimationController(vsync: this, duration: _swipeDuration);
+    _swipeController = AnimationController(
+      vsync: this,
+      duration: _swipeDuration,
+    );
     _enterController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -165,21 +171,26 @@ class _NewsTabState extends State<NewsTab>
     if (_result == null) return;
     // 광고 슬롯: 체류시간만 별도 집계
     if (_isAdSlot(index)) {
-      _analytics.logEvent(name: 'native_ad_view_duration', parameters: {
-        'slot': index,
-        'duration_seconds': elapsed.inSeconds,
-      });
+      _analytics.logEvent(
+        name: 'native_ad_view_duration',
+        parameters: {'slot': index, 'duration_seconds': elapsed.inSeconds},
+      );
       return;
     }
     final newsIdx = _newsIndexAt(index);
     if (newsIdx >= _result!.items.length) return; // 인사이트는 제외
     final item = _result!.items[newsIdx];
-    _analytics.logEvent(name: 'article_view', parameters: {
-      'title': item.title.length > 100 ? item.title.substring(0, 100) : item.title,
-      'region': widget.region,
-      'index': newsIdx,
-      'duration_seconds': elapsed.inSeconds,
-    });
+    _analytics.logEvent(
+      name: 'article_view',
+      parameters: {
+        'title': item.title.length > 100
+            ? item.title.substring(0, 100)
+            : item.title,
+        'region': widget.region,
+        'index': newsIdx,
+        'duration_seconds': elapsed.inSeconds,
+      },
+    );
     _recordConceptExposure(item.title);
   }
 
@@ -204,7 +215,8 @@ class _NewsTabState extends State<NewsTab>
   @override
   void didUpdateWidget(NewsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.category != widget.category || oldWidget.region != widget.region) {
+    if (oldWidget.category != widget.category ||
+        oldWidget.region != widget.region) {
       _currentIndex = 0;
       _showComplete = false;
       _fetchNews();
@@ -214,26 +226,37 @@ class _NewsTabState extends State<NewsTab>
   // ── 데이터 로직 ──
   Future<void> _fetchNews() async {
     if (_isLoading) return;
-    setState(() { _isLoading = true; _error = null; _isOfflineData = false; _showComplete = false; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _isOfflineData = false;
+      _showComplete = false;
+    });
     _exposedConceptIds.clear();
     _progress = null;
     final fetchStart = DateTime.now();
-    _analytics.logEvent(name: 'news_load_start', parameters: {
-      'region': widget.region,
-      'category': widget.category,
-    });
+    _analytics.logEvent(
+      name: 'news_load_start',
+      parameters: {'region': widget.region, 'category': widget.category},
+    );
 
     try {
-      final result = await ApiService.getNewsSummary(widget.region, category: widget.category);
+      final result = await ApiService.getNewsSummary(
+        widget.region,
+        category: widget.category,
+      );
       if (!mounted) return;
       setState(() => _result = result);
       _cardShownAt = DateTime.now();
-      _analytics.logEvent(name: 'news_load_success', parameters: {
-        'region': widget.region,
-        'category': widget.category,
-        'item_count': result.items.length,
-        'duration_ms': DateTime.now().difference(fetchStart).inMilliseconds,
-      });
+      _analytics.logEvent(
+        name: 'news_load_success',
+        parameters: {
+          'region': widget.region,
+          'category': widget.category,
+          'item_count': result.items.length,
+          'duration_ms': DateTime.now().difference(fetchStart).inMilliseconds,
+        },
+      );
 
       if (widget.category == 'general' && result.items.isNotEmpty) {
         NotificationService.updateNotificationWithNews(
@@ -243,30 +266,52 @@ class _NewsTabState extends State<NewsTab>
       }
 
       await CacheService.saveNews(widget.region, widget.category, {
-        'items': result.items.map((i) => {
-          'title': i.title, 'body': i.body,
-          'source_label': i.sourceLabel, 'source_url': i.sourceUrl,
-          'importance': i.importance,
-          'glossary': i.glossary.map((g) => {'term': g.term, 'definition': g.definition}).toList(),
-        }).toList(),
-        'insight': result.insight.toJson(), 'updated_at': result.updatedAt,
+        'items': result.items
+            .map(
+              (i) => {
+                'title': i.title,
+                'body': i.body,
+                'source_label': i.sourceLabel,
+                'source_url': i.sourceUrl,
+                'importance': i.importance,
+                'glossary': i.glossary
+                    .map((g) => {'term': g.term, 'definition': g.definition})
+                    .toList(),
+              },
+            )
+            .toList(),
+        'insight': result.insight.toJson(),
+        'updated_at': result.updatedAt,
       });
     } catch (e) {
       if (!mounted) return;
       final cached = await CacheService.getNews(widget.region, widget.category);
       if (cached != null) {
-        setState(() { _result = NewsResult.fromJson(cached); _isOfflineData = true; });
-        _cardShownAt = DateTime.now();
-        _analytics.logEvent(name: 'news_load_offline', parameters: {
-          'region': widget.region,
-          'error': e.toString().length > 80 ? e.toString().substring(0, 80) : e.toString(),
+        setState(() {
+          _result = NewsResult.fromJson(cached);
+          _isOfflineData = true;
         });
+        _cardShownAt = DateTime.now();
+        _analytics.logEvent(
+          name: 'news_load_offline',
+          parameters: {
+            'region': widget.region,
+            'error': e.toString().length > 80
+                ? e.toString().substring(0, 80)
+                : e.toString(),
+          },
+        );
       } else {
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
-        _analytics.logEvent(name: 'news_load_fail', parameters: {
-          'region': widget.region,
-          'error': e.toString().length > 80 ? e.toString().substring(0, 80) : e.toString(),
-        });
+        _analytics.logEvent(
+          name: 'news_load_fail',
+          parameters: {
+            'region': widget.region,
+            'error': e.toString().length > 80
+                ? e.toString().substring(0, 80)
+                : e.toString(),
+          },
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -276,32 +321,50 @@ class _NewsTabState extends State<NewsTab>
   Future<void> _openUrl(String url, String title) async {
     await ReadService.markRead(url, title);
     final host = Uri.tryParse(url)?.host ?? '';
-    _analytics.logEvent(name: 'source_url_opened', parameters: {
-      'host': host.length > 60 ? host.substring(0, 60) : host,
-      'index': _currentIndex,
-    });
+    _analytics.logEvent(
+      name: 'source_url_opened',
+      parameters: {
+        'host': host.length > 60 ? host.substring(0, 60) : host,
+        'index': _currentIndex,
+      },
+    );
     try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
       _analytics.logEvent(name: 'source_url_fail', parameters: {'host': host});
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('링크를 열 수 없습니다'), duration: Duration(seconds: 1)));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('링크를 열 수 없습니다'),
+            duration: Duration(seconds: 1),
+          ),
+        );
     }
   }
 
-  static const _playStoreUrl = 'https://play.google.com/store/apps/details?id=com.briefingnow.app';
+  static const _playStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.briefingnow.app';
 
   Future<void> _shareText(String title, String body) async {
-    _analytics.logEvent(name: 'news_share_tapped', parameters: {
-      'title_length': title.length,
-      'index': _currentIndex,
-    });
+    _analytics.logEvent(
+      name: 'news_share_tapped',
+      parameters: {'title_length': title.length, 'index': _currentIndex},
+    );
     final text = '$title\n\n$body\n\n— J-news\n$_playStoreUrl';
     try {
-      await share_plus.SharePlus.instance.share(share_plus.ShareParams(text: text, subject: title));
+      await share_plus.SharePlus.instance.share(
+        share_plus.ShareParams(text: text, subject: title),
+      );
     } catch (_) {
       try {
         await Clipboard.setData(ClipboardData(text: text));
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('클립보드에 복사했어요'), duration: Duration(seconds: 2)));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('클립보드에 복사했어요'),
+              duration: Duration(seconds: 2),
+            ),
+          );
       } catch (_) {}
     }
   }
@@ -337,16 +400,21 @@ class _NewsTabState extends State<NewsTab>
 
   int get _totalCards {
     if (_result == null) return 0;
-    return _result!.items.length + _adCount() + (_result!.insight.isEmpty ? 0 : 1);
+    return _result!.items.length +
+        _adCount() +
+        (_result!.insight.isEmpty ? 0 : 1);
   }
 
   /// 완독 화면 진입
   Future<void> _doComplete() async {
-    _analytics.logEvent(name: 'news_complete', parameters: {
-      'region': widget.region,
-      'total_cards': _totalCards,
-      'ab_cohort': AbService.cohort(AuthService.uid),
-    });
+    _analytics.logEvent(
+      name: 'news_complete',
+      parameters: {
+        'region': widget.region,
+        'total_cards': _totalCards,
+        'ab_cohort': AbService.cohort(AuthService.uid),
+      },
+    );
     final streak = await StreakService.recordCompletion();
     if (!mounted) return;
     setState(() {
@@ -369,11 +437,14 @@ class _NewsTabState extends State<NewsTab>
       _logArticleView(_currentIndex, DateTime.now().difference(_cardShownAt!));
     }
     _cardShownAt = DateTime.now();
-    _analytics.logEvent(name: 'card_swipe', parameters: {
-      'direction': 'next',
-      'from_index': _currentIndex,
-      'total': _totalCards,
-    });
+    _analytics.logEvent(
+      name: 'card_swipe',
+      parameters: {
+        'direction': 'next',
+        'from_index': _currentIndex,
+        'total': _totalCards,
+      },
+    );
     if (_currentIndex >= _totalCards - 1) {
       await _doComplete();
       return;
@@ -389,11 +460,14 @@ class _NewsTabState extends State<NewsTab>
       _logArticleView(_currentIndex, DateTime.now().difference(_cardShownAt!));
     }
     _cardShownAt = DateTime.now();
-    _analytics.logEvent(name: 'card_swipe', parameters: {
-      'direction': 'prev',
-      'from_index': _currentIndex,
-      'total': _totalCards,
-    });
+    _analytics.logEvent(
+      name: 'card_swipe',
+      parameters: {
+        'direction': 'prev',
+        'from_index': _currentIndex,
+        'total': _totalCards,
+      },
+    );
     setState(() => _currentIndex--);
     widget.onPageChanged?.call(_currentIndex, _totalCards);
     _enterController.forward(from: 0.0);
@@ -413,20 +487,35 @@ class _NewsTabState extends State<NewsTab>
 
   // ── 스와이프 제스처 핸들러 ──
   void _onPanUpdate(DragUpdateDetails d) {
-    setState(() => _dragX += d.delta.dx);
+    if (_swipeController.isAnimating) return;
+
+    final screenW = MediaQuery.of(context).size.width;
+    final maxDrag = screenW * 0.92;
+    final proposed = (_dragX + d.delta.dx).clamp(-maxDrag, maxDrag).toDouble();
+    final atFirstCard = _currentIndex <= 0 && proposed > 0;
+    final nextDragX = atFirstCard ? proposed * 0.38 : proposed;
+
+    setState(() => _dragX = nextDragX);
   }
 
   void _onPanEnd(DragEndDetails d) {
     final velocity = d.velocity.pixelsPerSecond.dx;
+    final threshold = _swipeCommitThreshold;
+    const minIntentDistance = 18.0;
     final hasVelocity = velocity.abs() > _swipeVelocityThreshold;
-    final dragLeft = _dragX < -_swipeThreshold;
-    final dragRight = _dragX > _swipeThreshold;
+    final dragLeft = _dragX < -threshold;
+    final dragRight = _currentIndex > 0 && _dragX > threshold;
 
     // 거리 임계값 넘었거나, 충분한 속도 + 같은 방향 드래그
-    if (dragLeft || (hasVelocity && velocity < 0 && _dragX < 0)) {
+    if (dragLeft ||
+        (hasVelocity && velocity < 0 && _dragX < -minIntentDistance)) {
       _swipeDirection = -1;
       _animateSwipe(() => _goNext(), velocity: velocity);
-    } else if (dragRight || (hasVelocity && velocity > 0 && _dragX > 0)) {
+    } else if (dragRight ||
+        (_currentIndex > 0 &&
+            hasVelocity &&
+            velocity > 0 &&
+            _dragX > minIntentDistance)) {
       _swipeDirection = 1;
       _animateSwipe(() => _goPrev(), velocity: velocity);
     } else {
@@ -435,11 +524,16 @@ class _NewsTabState extends State<NewsTab>
     }
   }
 
-  void _animateSwipe(VoidCallback? onComplete, {double velocity = 0}) {
+  void _animateSwipe(
+    FutureOr<void> Function()? onComplete, {
+    double velocity = 0,
+  }) {
     final startX = _dragX;
     final screenW = MediaQuery.of(context).size.width;
     final isCommit = onComplete != null;
-    final endX = isCommit ? (_swipeDirection < 0 ? -screenW * 1.15 : screenW * 1.15) : 0.0;
+    final endX = isCommit
+        ? (_swipeDirection < 0 ? -screenW * 1.15 : screenW * 1.15)
+        : 0.0;
 
     // 빠른 velocity → 더 짧게, 느림 → 기본
     final speedFactor = (velocity.abs() / 2000).clamp(0.0, 1.0);
@@ -451,27 +545,36 @@ class _NewsTabState extends State<NewsTab>
 
     _swipeController.duration = duration;
     _swipeController.reset();
-    final anim = Tween<double>(begin: startX, end: endX).animate(
-      CurvedAnimation(parent: _swipeController, curve: curve),
-    );
+    final anim = Tween<double>(
+      begin: startX,
+      end: endX,
+    ).animate(CurvedAnimation(parent: _swipeController, curve: curve));
 
     void listener() {
       setState(() => _dragX = anim.value);
     }
 
     anim.addListener(listener);
-    _swipeController.forward().then((_) {
+    _swipeController.forward().then((_) async {
       anim.removeListener(listener);
+      await onComplete?.call();
+      if (!mounted) return;
       setState(() => _dragX = 0);
-      onComplete?.call();
     });
   }
 
   // 드래그 진행률 (0.0 = 정지, 1.0 = 임계값 넘음). 다음 카드 scale/opacity 보간용.
   double get _dragProgress {
     final screenW = MediaQuery.of(context).size.width;
-    final norm = (_dragX.abs() / (screenW * 0.5)).clamp(0.0, 1.0);
+    final norm = (_dragX.abs() / (screenW * 0.42)).clamp(0.0, 1.0);
     return norm;
+  }
+
+  double get _swipeCommitThreshold {
+    final screenW = MediaQuery.of(context).size.width;
+    return (screenW * _swipeThresholdRatio)
+        .clamp(_swipeMinThreshold, _swipeMaxThreshold)
+        .toDouble();
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -497,7 +600,10 @@ class _NewsTabState extends State<NewsTab>
 
     if (_showComplete) {
       final completeScaleAnim = Tween<double>(begin: 0.96, end: 1.0).animate(
-        CurvedAnimation(parent: _completeController, curve: const Cubic(0.22, 1, 0.36, 1)),
+        CurvedAnimation(
+          parent: _completeController,
+          curve: const Cubic(0.22, 1, 0.36, 1),
+        ),
       );
       return GestureDetector(
         onHorizontalDragEnd: (d) {
@@ -516,6 +622,15 @@ class _NewsTabState extends State<NewsTab>
     }
 
     final scaffoldBg = isDark ? theme.colorScheme.surface : _kBg;
+    final isDraggingLeft = _dragX < 0;
+    final isDraggingRight = _dragX > 0;
+    final showPeek = _dragX != 0 || _dragProgress > 0;
+    final primaryPeekIndex = isDraggingRight
+        ? (_currentIndex > 0 ? _currentIndex - 1 : null)
+        : (_currentIndex + 1 < total ? _currentIndex + 1 : null);
+    final secondaryPeekIndex = isDraggingRight
+        ? (_currentIndex > 1 ? _currentIndex - 2 : null)
+        : (_currentIndex + 2 < total ? _currentIndex + 2 : null);
 
     return ColoredBox(
       color: scaffoldBg,
@@ -542,7 +657,7 @@ class _NewsTabState extends State<NewsTab>
                 clipBehavior: Clip.none,
                 children: [
                   // 세 번째 카드 (가장 뒤, 작고 흐리게) — 드래그 중에만 노출 (정지 시 뒷면 비침 방지)
-                  if (_currentIndex + 2 < total && (_dragX != 0 || _dragProgress > 0))
+                  if (secondaryPeekIndex != null && showPeek)
                     Positioned.fill(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(22, 22, 22, 6),
@@ -551,14 +666,18 @@ class _NewsTabState extends State<NewsTab>
                           transform: Matrix4.identity()..scale(0.88),
                           child: Opacity(
                             opacity: 0.18,
-                            child: _buildCard(_currentIndex + 2, theme, isDark),
+                            child: _buildCard(
+                              secondaryPeekIndex,
+                              theme,
+                              isDark,
+                            ),
                           ),
                         ),
                       ),
                     ),
 
                   // 두 번째 카드 (peek) — 드래그 중에만 노출 (정지 시 뒷면 비침 방지)
-                  if (_currentIndex + 1 < total && (_dragX != 0 || _dragProgress > 0))
+                  if (primaryPeekIndex != null && showPeek)
                     Positioned.fill(
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -572,8 +691,11 @@ class _NewsTabState extends State<NewsTab>
                           transform: Matrix4.identity()
                             ..scale(0.94 + 0.05 * _dragProgress),
                           child: Opacity(
-                            opacity: (0.50 + 0.45 * _dragProgress).clamp(0.0, 1.0),
-                            child: _buildCard(_currentIndex + 1, theme, isDark),
+                            opacity: (0.50 + 0.45 * _dragProgress).clamp(
+                              0.0,
+                              1.0,
+                            ),
+                            child: _buildCard(primaryPeekIndex, theme, isDark),
                           ),
                         ),
                       ),
@@ -589,18 +711,31 @@ class _NewsTabState extends State<NewsTab>
                         animation: _enterController,
                         builder: (_, child) {
                           final isDragging = _dragX != 0;
-                          final enterT = isDragging ? 1.0 :
-                              CurvedAnimation(parent: _enterController, curve: const Cubic(0.22, 1, 0.36, 1)).value;
+                          final enterT = isDragging
+                              ? 1.0
+                              : CurvedAnimation(
+                                  parent: _enterController,
+                                  curve: const Cubic(0.22, 1, 0.36, 1),
+                                ).value;
                           final enterScale = 0.96 + 0.04 * enterT;
-                          final enterOpacity = (0.85 + 0.15 * enterT).clamp(0.0, 1.0);
+                          final enterOpacity = (0.85 + 0.15 * enterT).clamp(
+                            0.0,
+                            1.0,
+                          );
                           return Opacity(
                             opacity: isDragging ? 1.0 : enterOpacity,
                             child: Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.identity()
-                                ..translate(_dragX, -8.0 * _dragProgress)
-                                ..rotateZ(_dragX * 0.0006)
-                                ..scale((1.0 - 0.02 * _dragProgress) * (isDragging ? 1.0 : enterScale)),
+                                ..translate(
+                                  _dragX,
+                                  isDraggingLeft ? -3.0 * _dragProgress : 0.0,
+                                )
+                                ..rotateZ(_dragX * 0.00035)
+                                ..scale(
+                                  (1.0 - 0.012 * _dragProgress) *
+                                      (isDragging ? 1.0 : enterScale),
+                                ),
                               child: child,
                             ),
                           );
@@ -617,33 +752,63 @@ class _NewsTabState extends State<NewsTab>
                         child: AnimatedBuilder(
                           animation: _hintController,
                           builder: (_, child) {
-                            final opacity = Tween<double>(begin: 0.12, end: 0.42)
-                                .evaluate(CurvedAnimation(parent: _hintController, curve: Curves.easeInOut));
+                            final opacity =
+                                Tween<double>(begin: 0.12, end: 0.42).evaluate(
+                                  CurvedAnimation(
+                                    parent: _hintController,
+                                    curve: Curves.easeInOut,
+                                  ),
+                                );
                             return Opacity(opacity: opacity, child: child);
                           },
                           child: Stack(
                             children: [
                               Positioned(
-                                left: 20, top: 0, bottom: 0,
+                                left: 20,
+                                top: 0,
+                                bottom: 0,
                                 child: Center(
-                                  child: Icon(Icons.chevron_left_rounded, size: 52,
-                                      color: isDark ? Colors.white : theme.colorScheme.onSurface),
+                                  child: Icon(
+                                    Icons.chevron_left_rounded,
+                                    size: 52,
+                                    color: isDark
+                                        ? Colors.white
+                                        : theme.colorScheme.onSurface,
+                                  ),
                                 ),
                               ),
                               Positioned(
-                                right: 20, top: 0, bottom: 0,
+                                right: 20,
+                                top: 0,
+                                bottom: 0,
                                 child: Center(
-                                  child: Icon(Icons.chevron_right_rounded, size: 52,
-                                      color: isDark ? Colors.white : theme.colorScheme.onSurface),
+                                  child: Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 52,
+                                    color: isDark
+                                        ? Colors.white
+                                        : theme.colorScheme.onSurface,
+                                  ),
                                 ),
                               ),
                               Positioned(
-                                bottom: 96, left: 0, right: 0,
+                                bottom: 96,
+                                left: 0,
+                                right: 0,
                                 child: Center(
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: (isDark ? Colors.white : Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.92),
+                                      color:
+                                          (isDark
+                                                  ? Colors.white
+                                                  : Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface)
+                                              .withValues(alpha: 0.92),
                                       borderRadius: BorderRadius.circular(24),
                                     ),
                                     child: Row(
@@ -653,7 +818,11 @@ class _NewsTabState extends State<NewsTab>
                                           child: Icon(
                                             Icons.arrow_back_rounded,
                                             size: 16,
-                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                            color: isDark
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface
+                                                : Colors.white,
                                           ),
                                         ),
                                         const SizedBox(width: 6),
@@ -662,7 +831,11 @@ class _NewsTabState extends State<NewsTab>
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w800,
-                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                            color: isDark
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface
+                                                : Colors.white,
                                           ),
                                         ),
                                         const SizedBox(width: 6),
@@ -670,7 +843,11 @@ class _NewsTabState extends State<NewsTab>
                                           child: Icon(
                                             Icons.arrow_forward_rounded,
                                             size: 16,
-                                            color: isDark ? Theme.of(context).colorScheme.onSurface : Colors.white,
+                                            color: isDark
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface
+                                                : Colors.white,
                                           ),
                                         ),
                                       ],
@@ -693,9 +870,22 @@ class _NewsTabState extends State<NewsTab>
             Padding(
               padding: const EdgeInsets.only(left: 20, bottom: 12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(8)),
-                child: Text('Offline', style: TextStyle(color: Colors.orange.shade800, fontSize: 11, fontWeight: FontWeight.w700)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Offline',
+                  style: TextStyle(
+                    color: Colors.orange.shade800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
         ],
@@ -710,10 +900,22 @@ class _NewsTabState extends State<NewsTab>
       return NativeAdCard(
         key: ValueKey('native_ad_$index'),
         isDark: isDark,
-        onAdLoaded: () => _analytics.logEvent(name: 'native_ad_loaded', parameters: {'slot': index}),
-        onAdFailed: () => _analytics.logEvent(name: 'native_ad_failed', parameters: {'slot': index}),
-        onAdImpression: () => _analytics.logEvent(name: 'native_ad_impression', parameters: {'slot': index}),
-        onAdClicked: () => _analytics.logEvent(name: 'native_ad_clicked', parameters: {'slot': index}),
+        onAdLoaded: () => _analytics.logEvent(
+          name: 'native_ad_loaded',
+          parameters: {'slot': index},
+        ),
+        onAdFailed: () => _analytics.logEvent(
+          name: 'native_ad_failed',
+          parameters: {'slot': index},
+        ),
+        onAdImpression: () => _analytics.logEvent(
+          name: 'native_ad_impression',
+          parameters: {'slot': index},
+        ),
+        onAdClicked: () => _analytics.logEvent(
+          name: 'native_ad_clicked',
+          parameters: {'slot': index},
+        ),
         onPrev: index > 0 ? _goPrev : null,
         onNext: _goNext,
       );
@@ -745,34 +947,50 @@ class _NewsTabState extends State<NewsTab>
       // 인사이트 카드
       return _InsightCardWidget(
         insight: insight,
-        onShare: () => _shareText('오늘의 핵심 인사이트', insight.summary.isNotEmpty ? insight.summary : insight.headline),
+        onShare: () => _shareText(
+          '오늘의 핵심 인사이트',
+          insight.summary.isNotEmpty ? insight.summary : insight.headline,
+        ),
         onComplete: _doComplete,
-        onAudioTap: _result!.dialogue.isEmpty ? null : () {
-          _analytics.logEvent(name: 'audio_briefing_from_insight');
-          Navigator.push(context, MaterialPageRoute(
-            builder: (_) => AudioBriefingScreen(
-              dialogue: _result!.dialogue,
-              headline: insight.headline.isNotEmpty ? insight.headline : '오늘의 브리핑',
-            ),
-          ));
-        },
+        onAudioTap: _result!.dialogue.isEmpty
+            ? null
+            : () {
+                _analytics.logEvent(name: 'audio_briefing_from_insight');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AudioBriefingScreen(
+                      dialogue: _result!.dialogue,
+                      headline: insight.headline.isNotEmpty
+                          ? insight.headline
+                          : '오늘의 브리핑',
+                    ),
+                  ),
+                );
+              },
       );
     }
   }
 
   // ── 완독 화면 ──
-  Widget _buildCompleteScreen(BuildContext context, ThemeData theme, bool isDark) {
+  Widget _buildCompleteScreen(
+    BuildContext context,
+    ThemeData theme,
+    bool isDark,
+  ) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: isDark
             ? LinearGradient(
                 colors: [theme.colorScheme.surface, theme.colorScheme.surface],
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               )
             : const LinearGradient(
                 colors: [Color(0xFFEFF4FF), Color(0xFFF5F6FA)],
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
       ),
       child: LayoutBuilder(
@@ -782,142 +1000,159 @@ class _NewsTabState extends State<NewsTab>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Text(
+                  '오늘 브리핑 완독!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.7,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '오늘의 주요 뉴스를 모두 확인했어요',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: _onSurfaceAlpha(context, 0.45),
+                  ),
+                ),
 
-          Text(
-            '오늘 브리핑 완독!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.7,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '오늘의 주요 뉴스를 모두 확인했어요',
-            style: TextStyle(fontSize: 15, height: 1.5, color: _onSurfaceAlpha(context, 0.45)),
-          ),
-
-          // 스트릭 뱃지 (제목 아래로 이동)
-          if (_streakCount > 0) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🔥', style: TextStyle(fontSize: 15)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$_streakCount일 연속 완독',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                // 스트릭 뱃지 (제목 아래로 이동)
+                if (_streakCount > 0) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🔥', style: TextStyle(fontSize: 15)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$_streakCount일 연속 완독',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFE65100),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 5, height: 5,
-                decoration: const BoxDecoration(color: Color(0xFF34C759), shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '매일 오전 7시 · 오후 6시 업데이트',
-                style: TextStyle(fontSize: 12, color: _onSurfaceAlpha(context, 0.35)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // 학습 진척 카드 — A/B: A군(viz on)만 노출. B군은 대조(viz 추가 전 동작).
-          if (AbService.vizEnabled(AuthService.uid) &&
-              _progress != null &&
-              !_progress!.isEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: ConceptProgressCard(
-                progress: _progress!,
-                newThisSession: _exposedConceptIds.length,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // 퀴즈 CTA — 문항이 있을 때만 표시 (메인 강조)
-          Builder(builder: (ctx) {
-            final sessionQuiz = QuizService.buildSessionQuiz(_result?.items ?? []);
-            if (sessionQuiz.isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: SizedBox(
-                width: double.infinity, height: 56,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    _analytics.logEvent(name: 'quiz_started', parameters: {
-                      'question_count': sessionQuiz.length,
-                    });
-                    final items = _result?.items ?? [];
-                    final glossaryCount = items.fold<int>(
-                        0, (sum, i) => sum + i.glossary.length);
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => QuizScreen(
-                        questions:
-                            sessionQuiz.map((e) => e.question).toList(),
-                        articleTitles:
-                            sessionQuiz.map((e) => e.articleTitle).toList(),
-                        newsCount: items.length,
-                        glossaryCount: glossaryCount,
-                        streakCount: _streakCount,
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF34C759),
+                        shape: BoxShape.circle,
                       ),
-                    ));
-                  },
-                  icon: const Icon(Icons.quiz_rounded, size: 18),
-                  label: const Text('오늘의 퀴즈 풀기',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _kPrimary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    elevation: isDark ? 0 : 4,
-                    shadowColor: _primaryAlpha(0.28),
-                  ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '매일 오전 7시 · 오후 6시 업데이트',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _onSurfaceAlpha(context, 0.35),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            );
-          }),
-          const SizedBox(height: 12),
+                const SizedBox(height: 32),
 
-          // 공유 버튼 (보조 — OutlinedButton)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: SizedBox(
-              width: double.infinity, height: 48,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  final items = _result?.items ?? [];
-                  final titles = items.map((i) => '• ${i.title}').join('\n');
-                  _shareText('오늘의 J-news 브리핑', '오늘의 주요 뉴스를 모두 읽었어요!\n\n$titles\n\n#J뉴스 #AI뉴스');
-                },
-                icon: const Icon(Icons.ios_share_rounded, size: 18),
-                label: const Text('공유하기', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isDark ? Colors.white : _kPrimary,
-                  side: BorderSide(color: (isDark ? Colors.white : _kPrimary).withValues(alpha: 0.35)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                // 학습 진척 카드 — A/B: A군(viz on)만 노출. B군은 대조(viz 추가 전 동작).
+                if (AbService.vizEnabled(AuthService.uid) &&
+                    _progress != null &&
+                    !_progress!.isEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: ConceptProgressCard(
+                      progress: _progress!,
+                      newThisSession: _exposedConceptIds.length,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 퀴즈 CTA — 문항이 있을 때만 표시 (메인 강조)
+                Builder(
+                  builder: (ctx) {
+                    final sessionQuiz = QuizService.buildSessionQuiz(
+                      _result?.items ?? [],
+                    );
+                    if (sessionQuiz.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            _analytics.logEvent(
+                              name: 'quiz_started',
+                              parameters: {
+                                'question_count': sessionQuiz.length,
+                              },
+                            );
+                            final items = _result?.items ?? [];
+                            final glossaryCount = items.fold<int>(
+                              0,
+                              (sum, i) => sum + i.glossary.length,
+                            );
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => QuizScreen(
+                                  questions: sessionQuiz
+                                      .map((e) => e.question)
+                                      .toList(),
+                                  articleTitles: sessionQuiz
+                                      .map((e) => e.articleTitle)
+                                      .toList(),
+                                  newsCount: items.length,
+                                  glossaryCount: glossaryCount,
+                                  streakCount: _streakCount,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.quiz_rounded, size: 18),
+                          label: const Text(
+                            '오늘의 퀴즈 풀기',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _kPrimary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: isDark ? 0 : 4,
+                            shadowColor: _primaryAlpha(0.28),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-          ),
               ],
             ),
           ),
@@ -932,20 +1167,56 @@ class _NewsTabState extends State<NewsTab>
       context: context,
       backgroundColor: theme.colorScheme.surface,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 32, height: 4, decoration: BoxDecoration(color: _onSurfaceAlpha(context, 0.1), borderRadius: BorderRadius.circular(2)))),
+            Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _onSurfaceAlpha(context, 0.1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
-            Text(glossary.term, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: theme.colorScheme.onSurface)),
+            Text(
+              glossary.term,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             const SizedBox(height: 12),
-            Text(glossary.definition, style: TextStyle(fontSize: 15, height: 1.6, color: theme.colorScheme.onSurface)),
+            Text(
+              glossary.definition,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.6,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             const SizedBox(height: 24),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(context), child: const Text('확인'))),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('확인'),
+              ),
+            ),
           ],
         ),
       ),
@@ -959,10 +1230,17 @@ class _NewsTabState extends State<NewsTab>
       children: [
         Shimmer.fromColors(
           baseColor: isDark ? const Color(0xFF2A2D35) : const Color(0xFFEBEBEB),
-          highlightColor: isDark ? const Color(0xFF353840) : const Color(0xFFF5F5F5),
+          highlightColor: isDark
+              ? const Color(0xFF353840)
+              : const Color(0xFFF5F5F5),
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: Container(decoration: BoxDecoration(color: context.jColors.surfaceCard, borderRadius: BorderRadius.circular(_kCardRadius))),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.jColors.surfaceCard,
+                borderRadius: BorderRadius.circular(_kCardRadius),
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -990,11 +1268,31 @@ class _NewsTabState extends State<NewsTab>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('📡', style: TextStyle(fontSize: 40, color: _onSurfaceAlpha(context, 0.35))),
+          Text(
+            '📡',
+            style: TextStyle(
+              fontSize: 40,
+              color: _onSurfaceAlpha(context, 0.35),
+            ),
+          ),
           const SizedBox(height: 12),
-          Text('뉴스를 불러오지 못했어요', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _onSurfaceAlpha(context, 0.7))),
+          Text(
+            '뉴스를 불러오지 못했어요',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _onSurfaceAlpha(context, 0.7),
+            ),
+          ),
           const SizedBox(height: 6),
-          Text('인터넷 연결을 확인하고\n다시 시도해주세요', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: _onSurfaceAlpha(context, 0.45))),
+          Text(
+            '인터넷 연결을 확인하고\n다시 시도해주세요',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: _onSurfaceAlpha(context, 0.45),
+            ),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             height: 48,
@@ -1002,10 +1300,15 @@ class _NewsTabState extends State<NewsTab>
               onPressed: _fetchNews,
               style: FilledButton.styleFrom(
                 backgroundColor: _kPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 padding: const EdgeInsets.symmetric(horizontal: 28),
               ),
-              child: const Text('다시 시도', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              child: const Text(
+                '다시 시도',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              ),
             ),
           ),
         ],
@@ -1064,7 +1367,8 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
   void _updateScrollHint() {
     if (!_bodyScroll.hasClients) return;
     final pos = _bodyScroll.position;
-    final hint = pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
+    final hint =
+        pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
     if (hint != _showScrollHint && mounted) {
       setState(() => _showScrollHint = hint);
     }
@@ -1101,13 +1405,15 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
         ),
       );
     } else {
-      await BookmarkService.add(BookmarkItem(
-        title: item.title,
-        body: item.body,
-        sourceLabel: item.sourceLabel,
-        sourceUrl: item.sourceUrl,
-        savedAt: DateTime.now().toIso8601String(),
-      ));
+      await BookmarkService.add(
+        BookmarkItem(
+          title: item.title,
+          body: item.body,
+          sourceLabel: item.sourceLabel,
+          sourceUrl: item.sourceUrl,
+          savedAt: DateTime.now().toIso8601String(),
+        ),
+      );
       if (!mounted) return;
       setState(() => _bookmarked = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1129,10 +1435,20 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
       decoration: BoxDecoration(
         color: context.jColors.surfaceCard,
         borderRadius: BorderRadius.circular(_kCardRadius),
-        boxShadow: isDark ? null : const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
-          BoxShadow(color: Color(0x0F000000), blurRadius: 24, offset: Offset(0, 8)),
-        ],
+        boxShadow: isDark
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+                BoxShadow(
+                  color: Color(0x0F000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1149,19 +1465,32 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                     children: [
                       // 번호 배지 (32x32, E8F0FF bg, radius 10)
                       Container(
-                        width: 32, height: 32,
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
                           color: isDark ? _primaryAlpha(0.18) : _kPrimaryLight,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Center(
-                          child: Text('$number', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isDark ? _kPrimary.withValues(alpha: 0.9) : _kPrimary)),
+                          child: Text(
+                            '$number',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: isDark
+                                  ? _kPrimary.withValues(alpha: 0.9)
+                                  : _kPrimary,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       // AI 요약 배지 (번호 옆)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: _kPrimaryLight,
                           borderRadius: BorderRadius.circular(6),
@@ -1169,9 +1498,20 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(Icons.auto_awesome_rounded, size: 11, color: _kPrimary),
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 11,
+                              color: _kPrimary,
+                            ),
                             SizedBox(width: 4),
-                            Text('AI가 요약했어요', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary)),
+                            Text(
+                              'AI가 요약했어요',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _kPrimary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1179,9 +1519,14 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                       // 중요도 배지 (importance 4 이상만 표시)
                       if ((item.importance ?? 0) >= 5)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF3B30).withValues(alpha: 0.1),
+                            color: const Color(
+                              0xFFFF3B30,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -1189,13 +1534,23 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                             children: const [
                               Text('🔥', style: TextStyle(fontSize: 11)),
                               SizedBox(width: 3),
-                              Text('오늘 핵심', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFFF3B30))),
+                              Text(
+                                '오늘 핵심',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFFF3B30),
+                                ),
+                              ),
                             ],
                           ),
                         )
                       else if ((item.importance ?? 0) == 4)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: _primaryAlpha(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -1203,9 +1558,20 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.trending_up_rounded, size: 12, color: _kPrimary),
+                              Icon(
+                                Icons.trending_up_rounded,
+                                size: 12,
+                                color: _kPrimary,
+                              ),
                               const SizedBox(width: 3),
-                              const Text('주목', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _kPrimary)),
+                              const Text(
+                                '주목',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: _kPrimary,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1218,20 +1584,29 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                           onTap: _toggleBookmark,
                           behavior: HitTestBehavior.opaque,
                           child: SizedBox(
-                            width: 40, height: 40,
+                            width: 40,
+                            height: 40,
                             child: Center(
                               child: Container(
-                                width: 32, height: 32,
+                                width: 32,
+                                height: 32,
                                 decoration: BoxDecoration(
                                   color: _bookmarked
                                       ? _primaryAlpha(isDark ? 0.22 : 0.10)
-                                      : _onSurfaceAlpha(context, isDark ? 0.08 : 0.05),
+                                      : _onSurfaceAlpha(
+                                          context,
+                                          isDark ? 0.08 : 0.05,
+                                        ),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Icon(
-                                  _bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                                  _bookmarked
+                                      ? Icons.bookmark_rounded
+                                      : Icons.bookmark_outline_rounded,
                                   size: 16,
-                                  color: _bookmarked ? _kPrimary : _onSurfaceAlpha(context, 0.45),
+                                  color: _bookmarked
+                                      ? _kPrimary
+                                      : _onSurfaceAlpha(context, 0.45),
                                 ),
                               ),
                             ),
@@ -1250,15 +1625,25 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                             height: 40,
                             child: Center(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _onSurfaceAlpha(context, isDark ? 0.08 : 0.05),
+                                  color: _onSurfaceAlpha(
+                                    context,
+                                    isDark ? 0.08 : 0.05,
+                                  ),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.ios_share_rounded, size: 13, color: _onSurfaceAlpha(context, 0.4)),
+                                    Icon(
+                                      Icons.ios_share_rounded,
+                                      size: 13,
+                                      color: _onSurfaceAlpha(context, 0.4),
+                                    ),
                                     const SizedBox(width: 5),
                                     Text(
                                       '공유',
@@ -1309,7 +1694,9 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w400,
                                 height: 1.7,
-                                color: isDark ? Colors.white.withValues(alpha: 0.7) : _onSurfaceAlpha(context, 0.70),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.7)
+                                    : _onSurfaceAlpha(context, 0.70),
                               ),
                             ),
                           ),
@@ -1323,13 +1710,18 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                             child: IgnorePointer(
                               child: Container(
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.only(top: 16, bottom: 2),
+                                padding: const EdgeInsets.only(
+                                  top: 16,
+                                  bottom: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
-                                      context.jColors.surfaceCard.withValues(alpha: 0),
+                                      context.jColors.surfaceCard.withValues(
+                                        alpha: 0,
+                                      ),
                                       context.jColors.surfaceCard,
                                     ],
                                   ),
@@ -1337,14 +1729,22 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.keyboard_arrow_down_rounded,
-                                        size: 16, color: _kPrimary.withValues(alpha: 0.75)),
+                                    Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 16,
+                                      color: _kPrimary.withValues(alpha: 0.75),
+                                    ),
                                     const SizedBox(width: 2),
-                                    Text('스크롤해서 더 보기',
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            color: _kPrimary.withValues(alpha: 0.75))),
+                                    Text(
+                                      '스크롤해서 더 보기',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: _kPrimary.withValues(
+                                          alpha: 0.75,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1361,38 +1761,60 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: item.glossary.map((g) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Semantics(
-                              label: '용어: ${g.term}',
-                              button: true,
-                              child: GestureDetector(
-                                onTap: () => widget.onGlossaryTap(g),
-                                behavior: HitTestBehavior.opaque,
-                                child: SizedBox(
-                                  height: 36,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: _primaryAlpha(0.08),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: _primaryAlpha(0.15), width: 1),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.info_outline_rounded, size: 11, color: _primaryAlpha(0.7)),
-                                          const SizedBox(width: 4),
-                                          Text(g.term, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary)),
-                                        ],
+                          children: item.glossary
+                              .map(
+                                (g) => Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: Semantics(
+                                    label: '용어: ${g.term}',
+                                    button: true,
+                                    child: GestureDetector(
+                                      onTap: () => widget.onGlossaryTap(g),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: SizedBox(
+                                        height: 36,
+                                        child: Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _primaryAlpha(0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: _primaryAlpha(0.15),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline_rounded,
+                                                  size: 11,
+                                                  color: _primaryAlpha(0.7),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  g.term,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: _kPrimary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          )).toList(),
+                              )
+                              .toList(),
                         ),
                       ),
                     ),
@@ -1413,15 +1835,23 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                 label: const Text(
                   'AI 튜터에게 물어보기',
                   // height 명시 + 패딩 제거 — 고정 높이 버튼에서 한글 글리프 하단 클리핑 방지
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.2),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    height: 1.2,
+                  ),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: widget.isDark ? _primaryAlpha(0.22) : _kPrimaryLight,
+                  backgroundColor: widget.isDark
+                      ? _primaryAlpha(0.22)
+                      : _kPrimaryLight,
                   foregroundColor: _kPrimary,
                   elevation: 0,
                   padding: EdgeInsets.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -1432,7 +1862,10 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
             child: Text(
               'AI 요약 · 원문을 확인하세요',
-              style: TextStyle(fontSize: 10, color: _onSurfaceAlpha(context, 0.35)),
+              style: TextStyle(
+                fontSize: 10,
+                color: _onSurfaceAlpha(context, 0.35),
+              ),
             ),
           ),
 
@@ -1442,19 +1875,34 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
               onTap: widget.onOpenUrl,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: _primaryAlpha(isDark ? 0.08 : 0.06),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(_kCardRadius)),
-                  border: Border(top: BorderSide(color: _primaryAlpha(0.12), width: 1)),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(_kCardRadius),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: _primaryAlpha(0.12), width: 1),
+                  ),
                 ),
                 child: Row(
                   children: [
                     // 아이콘 (28x28, radius 8)
                     Container(
-                      width: 28, height: 28,
-                      decoration: BoxDecoration(color: _primaryAlpha(0.12), borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(Icons.open_in_new_rounded, size: 14, color: _kPrimary),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _primaryAlpha(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.open_in_new_rounded,
+                        size: 14,
+                        color: _kPrimary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1462,14 +1910,33 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('원문 출처', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _onSurfaceAlpha(context, 0.45))),
+                          Text(
+                            '원문 출처',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: _onSurfaceAlpha(context, 0.45),
+                            ),
+                          ),
                           if (item.sourceLabel.isNotEmpty)
-                            Text(item.sourceLabel, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary)),
+                            Text(
+                              item.sourceLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kPrimary,
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right_rounded, size: 18, color: _primaryAlpha(0.5)),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: _primaryAlpha(0.5),
+                    ),
                   ],
                 ),
               ),
@@ -1520,7 +1987,8 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
   void _updateScrollHint() {
     if (!_scroll.hasClients) return;
     final pos = _scroll.position;
-    final hint = pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
+    final hint =
+        pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
     if (hint != _showScrollHint && mounted) {
       setState(() => _showScrollHint = hint);
     }
@@ -1529,9 +1997,9 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
   // mood별 색상/이모지
   static const _moodConfig = {
     'optimistic': (emoji: '📈', label: '긍정적', color: Color(0xFF34C759)),
-    'cautious':   (emoji: '⚠️', label: '주의',   color: Color(0xFFFF9500)),
-    'alarming':   (emoji: '🚨', label: '경계',   color: Color(0xFFFF3B30)),
-    'neutral':    (emoji: '➖', label: '중립',   color: Color(0xFFAAAAAA)),
+    'cautious': (emoji: '⚠️', label: '주의', color: Color(0xFFFF9500)),
+    'alarming': (emoji: '🚨', label: '경계', color: Color(0xFFFF3B30)),
+    'neutral': (emoji: '➖', label: '중립', color: Color(0xFFAAAAAA)),
   };
 
   @override
@@ -1551,8 +2019,30 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
         child: Stack(
           children: [
             // 배경 장식
-            Positioned(top: -50, right: -50, child: Container(width: 180, height: 180, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.03)))),
-            Positioned(bottom: -70, left: -30, child: Container(width: 200, height: 200, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF1B3FA6).withValues(alpha: 0.25)))),
+            Positioned(
+              top: -50,
+              right: -50,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.03),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -70,
+              left: -30,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1B3FA6).withValues(alpha: 0.25),
+                ),
+              ),
+            ),
 
             _buildUnlockedContent(),
 
@@ -1576,14 +2066,20 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.keyboard_arrow_down_rounded,
-                            size: 16, color: Colors.white.withValues(alpha: 0.8)),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
                         const SizedBox(width: 2),
-                        Text('스크롤해서 더 보기',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white.withValues(alpha: 0.8))),
+                        Text(
+                          '스크롤해서 더 보기',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1612,33 +2108,61 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 10),
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.white,
+                        size: 10,
+                      ),
                       const SizedBox(width: 4),
-                      Text('AI 심층 분석', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+                      Text(
+                        'AI 심층 분석',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 if (isStructured) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: mood.color.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: mood.color.withValues(alpha: 0.4), width: 1),
+                      border: Border.all(
+                        color: mood.color.withValues(alpha: 0.4),
+                        width: 1,
+                      ),
                     ),
                     child: Text(
                       '${mood.emoji} ${mood.label}',
-                      style: TextStyle(color: mood.color, fontSize: 10, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: mood.color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ],
@@ -1651,13 +2175,28 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
             if (isStructured && insight.headline.isNotEmpty) ...[
               Text(
                 insight.headline,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, height: 1.25, letterSpacing: -0.6),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                  letterSpacing: -0.6,
+                ),
               ),
               const SizedBox(height: 14),
               Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
               const SizedBox(height: 14),
             ] else ...[
-              const Text('AI가 분석한\n오늘의 핵심', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.3, letterSpacing: -0.5)),
+              const Text(
+                'AI가 분석한\n오늘의 핵심',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  height: 1.3,
+                  letterSpacing: -0.5,
+                ),
+              ),
               const SizedBox(height: 14),
             ],
 
@@ -1665,9 +2204,21 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
             if (isStructured && insight.points.isNotEmpty) ...[
               Row(
                 children: [
-                  const Icon(Icons.push_pin_rounded, color: Color(0xFF7EB3FF), size: 13),
+                  const Icon(
+                    Icons.push_pin_rounded,
+                    color: Color(0xFF7EB3FF),
+                    size: 13,
+                  ),
                   const SizedBox(width: 5),
-                  Text('핵심 포인트', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                  Text(
+                    '핵심 포인트',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -1680,18 +2231,34 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 20, height: 20,
+                        width: 20,
+                        height: 20,
                         decoration: BoxDecoration(
                           color: _kPrimary.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Center(
-                          child: Text('${idx + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                          child: Text(
+                            '${idx + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(point, style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 14, height: 1.5, fontWeight: FontWeight.w500)),
+                        child: Text(
+                          point,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 14,
+                            height: 1.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1704,26 +2271,53 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
 
             // 배경/맥락 (summary)
             if (insight.summary.isNotEmpty) ...[
-              if (isStructured) Row(
-                children: [
-                  const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF7EB3FF), size: 12),
-                  const SizedBox(width: 5),
-                  Text('배경', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
-                ],
-              ),
+              if (isStructured)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Color(0xFF7EB3FF),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '배경',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
               if (isStructured) const SizedBox(height: 8),
-              Text(insight.summary, style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 14, height: 1.7, fontWeight: FontWeight.w400)),
+              Text(
+                insight.summary,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 14,
+                  height: 1.7,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
             ],
 
             // 전망
             if (isStructured && insight.outlook.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1734,9 +2328,24 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('전망', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w700)),
+                          Text(
+                            '전망',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text(insight.outlook, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 13, height: 1.55, fontWeight: FontWeight.w500)),
+                          Text(
+                            insight.outlook,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.82),
+                              fontSize: 13,
+                              height: 1.55,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1744,7 +2353,6 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
                 ),
               ),
             ],
-
           ],
         ),
       ),
