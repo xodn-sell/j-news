@@ -399,7 +399,7 @@ class _QuizScreenState extends State<QuizScreen>
                 child: const Text(
                   '정답 확인',
                   style: TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 16),
+                      fontWeight: FontWeight.w800, fontSize: 16, height: 1.2),
                 ),
               ),
             ),
@@ -617,8 +617,9 @@ class _QuizScreenState extends State<QuizScreen>
                   ),
                   child: Text(
                     isLast ? '결과 보기' : '다음 문제 →',
+                    // height 명시 — 고정 높이 버튼서 한글 글리프 하단 클리핑 방지
                     style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 15),
+                        fontWeight: FontWeight.w800, fontSize: 15, height: 1.2),
                   ),
                 ),
               ),
