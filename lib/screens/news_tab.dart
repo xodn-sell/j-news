@@ -779,8 +779,24 @@ class _NewsTabState extends State<NewsTab>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
 
-          // 스트릭 뱃지
+          Text(
+            '오늘 브리핑 완독!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.7,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '오늘의 주요 뉴스를 모두 확인했어요',
+            style: TextStyle(fontSize: 15, height: 1.5, color: _onSurfaceAlpha(context, 0.45)),
+          ),
+
+          // 스트릭 뱃지 (제목 아래로 이동)
           if (_streakCount > 0) ...[
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -800,24 +816,8 @@ class _NewsTabState extends State<NewsTab>
                 ],
               ),
             ),
-            const SizedBox(height: 16),
           ],
-
-          Text(
-            '오늘 브리핑 완독!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.7,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '오늘의 주요 뉴스를 모두 확인했어요',
-            style: TextStyle(fontSize: 15, height: 1.5, color: _onSurfaceAlpha(context, 0.45)),
-          ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1525,6 +1525,30 @@ class _InsightCardWidget extends StatefulWidget {
 }
 
 class _InsightCardWidgetState extends State<_InsightCardWidget> {
+  final ScrollController _scroll = ScrollController();
+  bool _showScrollHint = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_updateScrollHint);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollHint());
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _updateScrollHint() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    final hint = pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
+    if (hint != _showScrollHint && mounted) {
+      setState(() => _showScrollHint = hint);
+    }
+  }
 
   // mood별 색상/이모지
   static const _moodConfig = {
@@ -1556,6 +1580,39 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
 
             _buildUnlockedContent(),
 
+            // 스크롤 더 있음 인디케이터 (하단 페이드 + ↓ 스크롤)
+            if (_showScrollHint)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.only(top: 18, bottom: 8),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x001B3FA6), Color(0xCC0D2060)],
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 16, color: Colors.white.withValues(alpha: 0.8)),
+                        const SizedBox(width: 2),
+                        Text('스크롤해서 더 보기',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white.withValues(alpha: 0.8))),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1569,6 +1626,7 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
 
     return Positioned.fill(
       child: SingleChildScrollView(
+        controller: _scroll,
         physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
         child: Column(
@@ -1608,26 +1666,6 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
                     ),
                   ),
                 ],
-                const Spacer(),
-                // 공유 버튼 (다른 카드와 동일 스타일)
-                GestureDetector(
-                  onTap: widget.onShare,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.ios_share_rounded, size: 12, color: Colors.white.withValues(alpha: 0.7)),
-                        const SizedBox(width: 4),
-                        Text('공유', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7))),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
 
@@ -1731,29 +1769,6 @@ class _InsightCardWidgetState extends State<_InsightCardWidget> {
               ),
             ],
 
-            // 오디오 브리핑 진입 (dialogue가 있을 때만)
-            if (widget.onAudioTap != null) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton.icon(
-                  onPressed: widget.onAudioTap,
-                  icon: const Icon(Icons.headphones_rounded, size: 18),
-                  label: const Text(
-                    '오디오로 듣기 (지음 & 소나)',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.18),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
