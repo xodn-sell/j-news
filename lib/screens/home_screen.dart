@@ -301,12 +301,7 @@ class _HomeScreenState extends State<HomeScreen>
                 onPageChanged: _onPageChanged,
               ),
             ),
-
-            // ── SRS 복습 배너 (due > 0, 맨 아래) — 단 AI 심층분석(마지막 카드)에선 숨김 ──
-            if (_reviewDueCount > 0 &&
-                _totalPages > 0 &&
-                _currentPage < _totalPages - 1)
-              _ReviewBanner(dueCount: _reviewDueCount, onTap: _openReview),
+            // (복습 진입은 헤더 우측 복습 아이콘 + due 배지로 유지 — 하단 배너 제거)
           ],
         ),
       ),
@@ -384,56 +379,3 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// ── SRS 복습 배너 — due > 0 일 때만 홈 헤더 아래 노출 ──
-class _ReviewBanner extends StatelessWidget {
-  final int dueCount;
-  final VoidCallback onTap;
-
-  const _ReviewBanner({required this.dueCount, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.jColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Semantics(
-      button: true,
-      label: '오늘 복습할 카드 $dueCount개. 복습 시작하기',
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Material(
-          color: isDark ? c.accent.withValues(alpha: 0.14) : c.surfaceTint,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              height: 48,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Row(
-                  children: [
-                    Icon(Icons.style_rounded, size: 18, color: c.accent),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '오늘 복습할 카드 $dueCount개',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: c.accent,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, size: 20, color: c.accent.withValues(alpha: 0.7)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -1183,6 +1183,23 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      // AI 요약 배지 (번호 옆)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _kPrimaryLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.auto_awesome_rounded, size: 11, color: _kPrimary),
+                            SizedBox(width: 4),
+                            Text('AI가 요약했어요', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       // 중요도 배지 (importance 4 이상만 표시)
                       if ((item.importance ?? 0) >= 5)
                         Container(
@@ -1438,35 +1455,12 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
             ),
           ),
 
-          // ── AI 요약 배지 + 면책 안내 ──
+          // ── 면책 안내 (AI 요약 배지는 상단 번호 옆으로 이동) ──
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _kPrimaryLight,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.auto_awesome_rounded, size: 11, color: _kPrimary),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'AI가 요약했어요',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kPrimary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'AI 요약 · 원문을 확인하세요',
-                  style: TextStyle(fontSize: 10, color: _onSurfaceAlpha(context, 0.35)),
-                ),
-              ],
+            child: Text(
+              'AI 요약 · 원문을 확인하세요',
+              style: TextStyle(fontSize: 10, color: _onSurfaceAlpha(context, 0.35)),
             ),
           ),
 
