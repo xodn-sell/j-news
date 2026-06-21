@@ -778,24 +778,6 @@ class _NewsTabState extends State<NewsTab>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 체크 아이콘 — 더 크고 임팩트 있게
-          Container(
-            width: 88, height: 88,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [_kPrimary.withValues(alpha: 0.25), _kPrimary.withValues(alpha: 0.12)]
-                    : [const Color(0xFF2563EB), _kPrimary],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: isDark ? null : [
-                BoxShadow(color: _kPrimary.withValues(alpha: 0.30), blurRadius: 20, offset: const Offset(0, 8)),
-              ],
-            ),
-            child: const Icon(Icons.check_rounded, size: 44, color: Colors.white),
-          ),
-          const SizedBox(height: 24),
 
           // 스트릭 뱃지
           if (_streakCount > 0) ...[
@@ -1084,23 +1066,41 @@ class _NewsCardWidget extends StatefulWidget {
 }
 
 class _NewsCardWidgetState extends State<_NewsCardWidget> {
-  bool _expanded = false;
   bool _bookmarked = false;
+  final ScrollController _bodyScroll = ScrollController();
+  bool _showScrollHint = false; // 본문에 스크롤할 내용이 더 있음
 
   @override
   void initState() {
     super.initState();
+    _bodyScroll.addListener(_updateScrollHint);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollHint());
     _loadBookmark();
+  }
+
+  @override
+  void dispose() {
+    _bodyScroll.dispose();
+    super.dispose();
+  }
+
+  /// 본문이 더 스크롤되는지 판정 → 하단 인디케이터 표시 토글.
+  void _updateScrollHint() {
+    if (!_bodyScroll.hasClients) return;
+    final pos = _bodyScroll.position;
+    final hint = pos.maxScrollExtent > 4 && pos.pixels < pos.maxScrollExtent - 8;
+    if (hint != _showScrollHint && mounted) {
+      setState(() => _showScrollHint = hint);
+    }
   }
 
   @override
   void didUpdateWidget(covariant _NewsCardWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.item.title != widget.item.title) {
-      setState(() {
-        _expanded = false;
-        _bookmarked = false;
-      });
+      setState(() => _bookmarked = false);
+      if (_bodyScroll.hasClients) _bodyScroll.jumpTo(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollHint());
       _loadBookmark();
     }
   }
@@ -1318,62 +1318,58 @@ class _NewsCardWidgetState extends State<_NewsCardWidget> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 본문 (15px, 1.7, 70%, maxLines 6 + fade + 더 보기)
+                  // 본문 (스크롤 가능 — 세로 드래그=본문 스크롤, 좌우만 카드 넘김.
+                  //        하단에 '스크롤' 인디케이터로 더 있음을 표시)
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
                       children: [
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              Text(
-                                item.body,
-                                maxLines: _expanded ? null : 6,
-                                overflow: _expanded ? TextOverflow.visible : TextOverflow.clip,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w400,
-                                  height: 1.7,
-                                  color: isDark ? Colors.white.withValues(alpha: 0.7) : _onSurfaceAlpha(context, 0.70),
-                                ),
+                        SingleChildScrollView(
+                          controller: _bodyScroll,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              item.body,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w400,
+                                height: 1.7,
+                                color: isDark ? Colors.white.withValues(alpha: 0.7) : _onSurfaceAlpha(context, 0.70),
                               ),
-                              if (!_expanded)
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: ShaderMask(
-                                    shaderCallback: (rect) => const LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [Colors.white, Colors.transparent],
-                                      stops: [0.5, 1.0],
-                                    ).createShader(rect),
-                                    blendMode: BlendMode.dstIn,
-                                    child: Container(
-                                      height: 40,
-                                      color: context.jColors.surfaceCard,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
                         ),
-                        if (_expanded || item.body.length >= 200)
-                          GestureDetector(
-                            onTap: () => setState(() => _expanded = !_expanded),
-                            behavior: HitTestBehavior.opaque,
-                            child: SizedBox(
-                              height: 32,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  _expanded ? '접기' : '더 보기',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0052CC),
+                        // 스크롤 더 있음 인디케이터 (하단 페이드 + ↓ 스크롤)
+                        if (_showScrollHint)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: IgnorePointer(
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.only(top: 16, bottom: 2),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      context.jColors.surfaceCard.withValues(alpha: 0),
+                                      context.jColors.surfaceCard,
+                                    ],
                                   ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.keyboard_arrow_down_rounded,
+                                        size: 16, color: _kPrimary.withValues(alpha: 0.75)),
+                                    const SizedBox(width: 2),
+                                    Text('스크롤해서 더 보기',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: _kPrimary.withValues(alpha: 0.75))),
+                                  ],
                                 ),
                               ),
                             ),
