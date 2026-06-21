@@ -539,10 +539,15 @@ class _QuizScreenState extends State<QuizScreen>
           border: Border.all(color: borderColor, width: 2),
         ),
         child: Center(
-          child: Icon(
-            isO ? Icons.radio_button_unchecked_rounded : Icons.close_rounded,
-            size: 52,
-            color: symbolColor,
+          // 데이터 옵션 글자('O'/'X')를 크게 — OX 선택임을 분명히
+          child: Text(
+            q.options[idx],
+            style: TextStyle(
+              fontSize: 56,
+              fontWeight: FontWeight.w900,
+              height: 1.0,
+              color: symbolColor,
+            ),
           ),
         ),
       ),
