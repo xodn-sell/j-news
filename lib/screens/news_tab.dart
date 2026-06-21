@@ -775,9 +775,13 @@ class _NewsTabState extends State<NewsTab>
                 begin: Alignment.topCenter, end: Alignment.bottomCenter,
               ),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
 
           Text(
             '오늘 브리핑 완독!',
@@ -914,7 +918,10 @@ class _NewsTabState extends State<NewsTab>
               ),
             ),
           ),
-        ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
