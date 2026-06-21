@@ -332,13 +332,14 @@ class _NewsTabState extends State<NewsTab>
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
       _analytics.logEvent(name: 'source_url_fail', parameters: {'host': host});
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('링크를 열 수 없습니다'),
             duration: Duration(seconds: 1),
           ),
         );
+      }
     }
   }
 
@@ -358,13 +359,14 @@ class _NewsTabState extends State<NewsTab>
     } catch (_) {
       try {
         await Clipboard.setData(ClipboardData(text: text));
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('클립보드에 복사했어요'),
               duration: Duration(seconds: 2),
             ),
           );
+        }
       } catch (_) {}
     }
   }
