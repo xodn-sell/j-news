@@ -139,30 +139,54 @@ class NotificationService {
     debugPrint('[J-news] 알림 스케줄 등록 완료 (매일 07:00 / 18:00)');
   }
 
-  /// 앱에서 뉴스 로드 후 첫 번째 뉴스 제목으로 알림 내용 업데이트 (아침/저녁 모두)
-  static Future<void> updateNotificationWithNews(String topNewsTitle) async {
+  /// 앱에서 뉴스 로드 후 첫 번째 기사 제목+요약으로 알림 내용 업데이트 (아침/저녁 모두).
+  /// 알림 제목 = 기사 제목, 본문 = 기사 요약(2~3문장). BigText로 펼쳐 전체 표시.
+  static Future<void> updateNotificationWithNews(
+      String topNewsTitle, String topNewsSummary) async {
     final canExact = await _canScheduleExact();
-    final body = topNewsTitle.length > 50
-        ? '${topNewsTitle.substring(0, 47)}...'
-        : topNewsTitle;
+    final title = topNewsTitle.trim().isEmpty ? 'J-NEWS 브리핑' : topNewsTitle.trim();
+    final summary = topNewsSummary.trim().isEmpty ? topNewsTitle.trim() : topNewsSummary.trim();
 
     await _scheduleDaily(
       id: 0,
       hour: 7,
-      title: 'J-NEWS 브리핑',
-      body: body,
+      title: title,
+      body: summary,
+      bigText: summary,
       payload: 'briefing_morning',
       useExactAlarm: canExact,
     );
     await _scheduleDaily(
       id: 1,
       hour: 18,
-      title: 'J-NEWS 저녁 브리핑',
-      body: body,
+      title: title,
+      body: summary,
+      bigText: summary,
       payload: 'briefing_evening',
       useExactAlarm: canExact,
     );
-    debugPrint('[J-news] 알림 내용 업데이트 (morning + evening): $body');
+    debugPrint('[J-news] 알림 내용 업데이트 (제목+요약): $title / $summary');
+  }
+
+  /// bigText 주어지면 BigTextStyle로 본문 전체를 펼쳐 보여주는 details 생성.
+  static NotificationDetails _detailsFor(String? bigText) {
+    if (bigText == null) return _notificationDetails;
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        'news_briefing',
+        'J-news 뉴스 브리핑',
+        channelDescription: '매일 뉴스 요약 알림',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        styleInformation: BigTextStyleInformation(bigText),
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
   }
 
   static Future<void> _scheduleDaily({
@@ -172,6 +196,7 @@ class NotificationService {
     required String body,
     required bool useExactAlarm,
     String? payload,
+    String? bigText,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour);
@@ -187,7 +212,7 @@ class NotificationService {
         title: title,
         body: body,
         scheduledDate: scheduled,
-        notificationDetails: _notificationDetails,
+        notificationDetails: _detailsFor(bigText),
         androidScheduleMode: useExactAlarm
             ? AndroidScheduleMode.exactAllowWhileIdle
             : AndroidScheduleMode.inexactAllowWhileIdle,

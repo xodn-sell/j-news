@@ -236,7 +236,10 @@ class _NewsTabState extends State<NewsTab>
       });
 
       if (widget.category == 'general' && result.items.isNotEmpty) {
-        NotificationService.updateNotificationWithNews(result.items.first.title);
+        NotificationService.updateNotificationWithNews(
+          result.items.first.title,
+          result.items.first.body,
+        );
       }
 
       await CacheService.saveNews(widget.region, widget.category, {
