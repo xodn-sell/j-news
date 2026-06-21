@@ -1,7 +1,6 @@
-/// KST 기반 뉴스 세션 타이밍 헬퍼.
+/// KST 기반 뉴스 세션 타이밍 헬퍼 (2회/일 — 아침·저녁).
 /// 세션 경계:
-///   07:00~11:59 → morning
-///   12:00~17:59 → noon
+///   07:00~17:59 → morning
 ///   18:00~23:59 → evening (오늘 날짜)
 ///   00:00~06:59 → evening (어제 날짜) — 새벽은 전일 evening 연장
 class NewsSession {
@@ -22,40 +21,32 @@ class NewsSession {
       final yesterday = kst.subtract(const Duration(days: 1));
       return '${_dateStr(yesterday)}_evening';
     }
-    if (hour < 12) {
-      return '${_dateStr(kst)}_morning';
-    }
-    return '${_dateStr(kst)}_noon';
+    return '${_dateStr(kst)}_morning';
   }
 
   /// 현재 세션 라벨 (UI 표시용)
   static String currentSessionLabel() {
     final key = currentSessionKey();
     if (key.endsWith('_morning')) return '오전';
-    if (key.endsWith('_noon')) return '낮';
     return '저녁';
   }
 
   /// 다음 세션 시작 시각 (KST 기준 DateTime).
-  /// 경계: 07:00 morning, 12:00 noon, 18:00 evening, 다음날 07:00 morning.
+  /// 경계: 07:00 morning, 18:00 evening, 다음날 07:00 morning.
   static DateTime nextSessionBoundaryKst() {
     final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
     final h = kst.hour;
     DateTime build(int hour, {int dayOffset = 0}) =>
         DateTime(kst.year, kst.month, kst.day + dayOffset, hour);
     if (h < 7) return build(7);
-    if (h < 12) return build(12);
     if (h < 18) return build(18);
     return build(7, dayOffset: 1);
   }
 
-  /// 다음 세션 라벨 ('오전'|'낮'|'저녁')
+  /// 다음 세션 라벨 ('오전'|'저녁')
   static String nextSessionLabel() {
     final next = nextSessionBoundaryKst();
-    final h = next.hour;
-    if (h == 7) return '오전';
-    if (h == 12) return '낮';
-    return '저녁';
+    return next.hour == 7 ? '오전' : '저녁';
   }
 
   /// 다음 세션까지 남은 시간 표시 ("4시간 12분", "32분" 등)

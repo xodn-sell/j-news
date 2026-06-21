@@ -18,7 +18,6 @@
   ],
   "crons": [
     { "path": "/api/cron?region=world&category=general", "schedule": "0 22 * * *" },
-    { "path": "/api/cron?region=world&category=general", "schedule": "0 3 * * *" },
     { "path": "/api/cron?region=world&category=general", "schedule": "0 9 * * *" }
   ]
 }

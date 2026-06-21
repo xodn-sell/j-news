@@ -321,16 +321,14 @@ CONCEPT_PROMPT = """아래 오늘의 뉴스에서 핵심 개념을 추출해 정
 
 
 def _session_key(now=None) -> str:
-    """KST 시간 → {YYYY-MM-DD}_{morning|noon|evening}. client PointBalance 규칙과 동일.
-    00:00~06:59 새벽은 전일 evening 연장."""
+    """KST 시간 → {YYYY-MM-DD}_{morning|evening}. 2회/일(07/18) 세션.
+    07:00~17:59 morning, 18:00~23:59 evening, 00:00~06:59 전일 evening 연장."""
     KST = timezone(timedelta(hours=9))
     now = now or datetime.now(KST)
     h = now.hour
-    if 7 <= h < 12:
+    if 7 <= h < 18:
         return f"{now.strftime('%Y-%m-%d')}_morning"
-    if 12 <= h < 18:
-        return f"{now.strftime('%Y-%m-%d')}_noon"
-    if 18 <= h < 24:
+    if h >= 18:
         return f"{now.strftime('%Y-%m-%d')}_evening"
     prev = now - timedelta(days=1)
     return f"{prev.strftime('%Y-%m-%d')}_evening"
