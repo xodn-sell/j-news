@@ -914,37 +914,6 @@ class _NewsTabState extends State<NewsTab>
               ),
             ),
           ),
-          // 오디오 브리핑 진입 (dialogue가 있을 때만)
-          if ((_result?.dialogue ?? []).isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final dialogue = _result!.dialogue;
-                    final headline = _result!.insight.headline;
-                    _analytics.logEvent(name: 'audio_briefing_from_complete');
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => AudioBriefingScreen(
-                        dialogue: dialogue,
-                        headline: headline.isNotEmpty ? headline : '오늘의 브리핑',
-                      ),
-                    ));
-                  },
-                  icon: const Icon(Icons.headphones_rounded, size: 18),
-                  label: const Text('오디오로 다시 듣기', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : _kPrimary,
-                    side: BorderSide(color: (isDark ? Colors.white : _kPrimary).withValues(alpha: 0.35)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
