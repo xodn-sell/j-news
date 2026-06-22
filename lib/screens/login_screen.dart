@@ -371,7 +371,28 @@ class _LoginScreenState extends State<LoginScreen>
                                 textAlign: TextAlign.center,
                               ),
 
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 28),
+
+                              // 피처 하이라이트
+                              const _FeatureRow(
+                                icon: '📰',
+                                title: '하루 2번 AI 뉴스 브리핑',
+                                sub: '아침·저녁 자동 큐레이션',
+                              ),
+                              const SizedBox(height: 8),
+                              const _FeatureRow(
+                                icon: '💬',
+                                title: 'AI 튜터',
+                                sub: '궁금한 점 바로 물어보기',
+                              ),
+                              const SizedBox(height: 8),
+                              const _FeatureRow(
+                                icon: '📝',
+                                title: '오늘의 퀴즈로 복습',
+                                sub: '읽은 뉴스 바로 확인하며 학습',
+                              ),
+
+                              const SizedBox(height: 20),
 
                               // 에러
                               if (_errorMessage != null) ...[
@@ -500,6 +521,72 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeatureRow extends StatelessWidget {
+  final String icon;
+  final String title;
+  final String sub;
+
+  const _FeatureRow({
+    required this.icon,
+    required this.title,
+    required this.sub,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.jColors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: c.surfaceElevated.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.accent.withValues(alpha: 0.10), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: c.accent.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sub,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: c.textPrimary.withValues(alpha: 0.60),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
