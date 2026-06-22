@@ -51,7 +51,9 @@ class _LoginScreenState extends State<LoginScreen>
       builder: (ctx) {
         final size = MediaQuery.of(ctx).size;
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             privacy ? '개인정보처리방침' : '서비스 이용약관',
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
@@ -68,7 +70,10 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('확인')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('확인'),
+            ),
           ],
         );
       },
@@ -111,7 +116,8 @@ class _LoginScreenState extends State<LoginScreen>
 본 약관은 2026년 6월 5일부터 시행합니다.
 문의: xowns142857@gmail.com''';
 
-  static const String _privacyPolicyText = '''지음뉴스(이하 "회사")는 정보통신망 이용촉진 및 정보보호 등에 관한 법률, 개인정보 보호법 등 관련 법령에 따라 이용자의 개인정보를 보호하고 권익을 존중합니다.
+  static const String _privacyPolicyText =
+      '''지음뉴스(이하 "회사")는 정보통신망 이용촉진 및 정보보호 등에 관한 법률, 개인정보 보호법 등 관련 법령에 따라 이용자의 개인정보를 보호하고 권익을 존중합니다.
 
 제1조 (수집하는 개인정보 항목)
 1. 회원 가입 및 인증
@@ -170,7 +176,10 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _errorMessage = '필수 약관에 동의해주세요.');
       return;
     }
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     final analytics = FirebaseAnalytics.instance;
     final attemptStart = DateTime.now();
@@ -188,13 +197,15 @@ class _LoginScreenState extends State<LoginScreen>
       final durationMs = DateTime.now().difference(attemptStart).inMilliseconds;
       await analytics.setUserId(id: user.uid);
       await analytics.setUserProperty(name: 'signed_in', value: 'true');
-      analytics.logEvent(name: 'login_success', parameters: {
-        'duration_ms': durationMs,
-      });
+      analytics.logEvent(
+        name: 'login_success',
+        parameters: {'duration_ms': durationMs},
+      );
 
       final prefs = await SharedPreferences.getInstance();
       // uid-scoped onboarding flag (신규 계정이면 false)
-      bool onboardingDone = prefs.getBool('onboarding_done_${user.uid}') ?? false;
+      bool onboardingDone =
+          prefs.getBool('onboarding_done_${user.uid}') ?? false;
 
       // 레거시 마이그레이션: 같은 디바이스에서 이전 앱 버전을 쓰던 유저의
       // 기존 `onboarding_done` 플래그가 있고, 이게 바로 이 계정일 수 있음.
@@ -210,26 +221,34 @@ class _LoginScreenState extends State<LoginScreen>
         }
       }
 
-      analytics.logEvent(name: 'login_routed', parameters: {
-        'destination': onboardingDone ? 'home' : 'onboarding',
-      });
+      analytics.logEvent(
+        name: 'login_routed',
+        parameters: {'destination': onboardingDone ? 'home' : 'onboarding'},
+      );
 
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => onboardingDone
-              ? const HomeScreen()
-              : const OnboardingScreen(),
+          builder: (_) =>
+              onboardingDone ? const HomeScreen() : const OnboardingScreen(),
         ),
         (route) => false,
       );
     } catch (e) {
       analytics.logEvent(
         name: 'login_fail',
-        parameters: {'error': e.toString().substring(0, e.toString().length > 100 ? 100 : e.toString().length)},
+        parameters: {
+          'error': e.toString().substring(
+            0,
+            e.toString().length > 100 ? 100 : e.toString().length,
+          ),
+        },
       );
-      setState(() { _isLoading = false; _errorMessage = '로그인에 실패했습니다. 다시 시도해주세요.'; });
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '로그인에 실패했습니다. 다시 시도해주세요.';
+      });
     }
   }
 
@@ -252,24 +271,37 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             // 배경 장식 원
             Positioned(
-              top: -100, right: -80,
+              top: -100,
+              right: -80,
               child: _DecorCircle(size: 280, color: c.accent, opacity: 0.06),
             ),
             Positioned(
-              top: 60, right: 10,
+              top: 60,
+              right: 10,
               child: _DecorCircle(size: 110, color: c.accent, opacity: 0.05),
             ),
             Positioned(
-              bottom: -130, left: -100,
+              bottom: -130,
+              left: -100,
               child: _DecorCircle(size: 340, color: c.accent, opacity: 0.07),
             ),
             Positioned(
-              bottom: 180, right: -40,
-              child: _DecorCircle(size: 150, color: c.accentLight, opacity: 0.08),
+              bottom: 180,
+              right: -40,
+              child: _DecorCircle(
+                size: 150,
+                color: c.accentLight,
+                opacity: 0.08,
+              ),
             ),
             Positioned(
-              top: 280, left: -30,
-              child: _DecorCircle(size: 100, color: c.accentLight, opacity: 0.06),
+              top: 280,
+              left: -30,
+              child: _DecorCircle(
+                size: 100,
+                color: c.accentLight,
+                opacity: 0.06,
+              ),
             ),
 
             // 메인 콘텐츠
@@ -278,155 +310,189 @@ class _LoginScreenState extends State<LoginScreen>
                 opacity: _fadeAnim,
                 child: SlideTransition(
                   position: _slideAnim,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      children: [
-                        const Spacer(flex: 1),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            children: [
+                              const Spacer(flex: 1),
 
-                        // 로고
-                        Container(
-                          width: 84, height: 84,
-                          decoration: BoxDecoration(
-                            color: c.accent,
-                            borderRadius: BorderRadius.circular(26),
-                            boxShadow: [
-                              BoxShadow(
-                                color: c.accent.withValues(alpha: 0.30),
-                                blurRadius: 32,
-                                spreadRadius: 2,
-                                offset: const Offset(0, 8),
+                              // 로고
+                              Container(
+                                width: 84,
+                                height: 84,
+                                decoration: BoxDecoration(
+                                  color: c.accent,
+                                  borderRadius: BorderRadius.circular(26),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: c.accent.withValues(alpha: 0.30),
+                                      blurRadius: 32,
+                                      spreadRadius: 2,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: Image.asset(
+                                    'assets/app_icon.png',
+                                    width: 84,
+                                    height: 84,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
+                              const SizedBox(height: 24),
+
+                              Text(
+                                'J-NEWS',
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                  color: c.textPrimary,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'AI가 매일 골라주는 오늘의 핵심 뉴스',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                  color: c.textPrimary.withValues(alpha: 0.45),
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              const SizedBox(height: 32),
+
+                              // 에러
+                              if (_errorMessage != null) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: c.error.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: c.error.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: TextStyle(
+                                      color: c.errorAlt,
+                                      fontSize: 13,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+
+                              // 약관 동의 체크박스
+                              _ConsentRow(
+                                required: true,
+                                label: '이용약관 · 개인정보처리방침 동의',
+                                checked: _agreeRequired,
+                                onChanged: (v) => setState(() {
+                                  _agreeRequired = v;
+                                  if (v) _errorMessage = null;
+                                }),
+                                onViewTap: () =>
+                                    _showConsentDialog(privacy: false),
+                                onViewTap2: () =>
+                                    _showConsentDialog(privacy: true),
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Google 로그인 버튼 (베네핏 강조 CTA)
+                              SizedBox(
+                                width: double.infinity,
+                                height: 64,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : _handleGoogleSignIn,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: c.surfaceElevated,
+                                    foregroundColor: c.textPrimary,
+                                    disabledBackgroundColor: c.surfaceElevated
+                                        .withValues(alpha: 0.55),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    elevation: 0,
+                                    shadowColor: Colors.transparent,
+                                  ),
+                                  child: _isLoading
+                                      ? SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: c.accent,
+                                          ),
+                                        )
+                                      : Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const _GoogleLogo(size: 20),
+                                                const SizedBox(width: 10),
+                                                Text(
+                                                  'Google로 시작하기',
+                                                  style: TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: -0.5,
+                                                    color: _agreeRequired
+                                                        ? c.textPrimary
+                                                        : c.textPrimary
+                                                              .withValues(
+                                                                alpha: 0.45,
+                                                              ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _agreeRequired
+                                                  ? 'Google 계정으로 3초만에'
+                                                  : '약관 동의 후 진행 가능',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: c.textPrimary.withValues(
+                                                  alpha: 0.48,
+                                                ),
+                                                fontWeight: FontWeight.w500,
+                                                letterSpacing: -0.2,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                              const Spacer(flex: 2),
                             ],
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.asset('assets/app_icon.png', width: 84, height: 84, fit: BoxFit.cover),
-                          ),
                         ),
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'J-NEWS',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            color: c.textPrimary,
-                            letterSpacing: -1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'AI가 매일 골라주는 오늘의 핵심 뉴스',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            color: c.textPrimary.withValues(alpha: 0.45),
-                            height: 1.5,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // 피처 하이라이트
-                        const _FeatureRow(icon: '📰', title: '하루 3번 AI 뉴스 브리핑', sub: '아침·점심·저녁 자동 큐레이션'),
-                        const SizedBox(height: 8),
-                        const _FeatureRow(icon: '💬', title: 'AI 튜터', sub: '궁금한 점 바로 물어보기'),
-                        const SizedBox(height: 8),
-                        const _FeatureRow(icon: '🎧', title: '오디오로 듣기', sub: '진행자 2명의 라디오 브리핑'),
-
-                        const SizedBox(height: 20),
-
-                        // 에러
-                        if (_errorMessage != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: c.error.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: c.error.withValues(alpha: 0.25)),
-                            ),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(color: c.errorAlt, fontSize: 13),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                        ],
-
-                        // 약관 동의 체크박스
-                        _ConsentRow(
-                          required: true,
-                          label: '이용약관 · 개인정보처리방침 동의',
-                          checked: _agreeRequired,
-                          onChanged: (v) => setState(() {
-                            _agreeRequired = v;
-                            if (v) _errorMessage = null;
-                          }),
-                          onViewTap: () => _showConsentDialog(privacy: false),
-                          onViewTap2: () => _showConsentDialog(privacy: true),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Google 로그인 버튼 (베네핏 강조 CTA)
-                        SizedBox(
-                          width: double.infinity,
-                          height: 64,
-                          child: ElevatedButton(
-                            onPressed: (_isLoading || !_agreeRequired) ? null : _handleGoogleSignIn,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: c.surfaceElevated,
-                              foregroundColor: c.textPrimary,
-                              disabledBackgroundColor: c.surfaceElevated.withValues(alpha: 0.55),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                            ),
-                            child: _isLoading
-                                ? SizedBox(
-                                    width: 22, height: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: c.accent),
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const _GoogleLogo(size: 20),
-                                          const SizedBox(width: 10),
-                                          Text(
-                                            'Google로 시작하기',
-                                            style: TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: -0.5,
-                                              color: _agreeRequired
-                                                  ? c.textPrimary
-                                                  : c.textPrimary.withValues(alpha: 0.45),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _agreeRequired ? 'Google 계정으로 3초만에' : '약관 동의 후 진행 가능',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: c.textPrimary.withValues(alpha: 0.48),
-                                          fontWeight: FontWeight.w500,
-                                          letterSpacing: -0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                        const Spacer(flex: 2),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -434,55 +500,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FeatureRow extends StatelessWidget {
-  final String icon;
-  final String title;
-  final String sub;
-
-  const _FeatureRow({required this.icon, required this.title, required this.sub});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.jColors;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: c.surfaceElevated.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.accent.withValues(alpha: 0.10), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: c.accent.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                sub,
-                style: TextStyle(fontSize: 12, color: c.textPrimary.withValues(alpha: 0.45)),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -518,12 +535,15 @@ class _ConsentRow extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 140),
-              width: 20, height: 20,
+              width: 20,
+              height: 20,
               decoration: BoxDecoration(
                 color: checked ? c.accent : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: checked ? c.accent : c.textPrimary.withValues(alpha: 0.30),
+                  color: checked
+                      ? c.accent
+                      : c.textPrimary.withValues(alpha: 0.30),
                   width: 1.6,
                 ),
               ),
@@ -540,7 +560,12 @@ class _ConsentRow extends StatelessWidget {
               ),
               child: Text(
                 required ? '필수' : '선택',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: tagColor, letterSpacing: -0.2),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: tagColor,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -559,7 +584,10 @@ class _ConsentRow extends StatelessWidget {
               GestureDetector(
                 onTap: onViewTap,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 12,
+                  ),
                   child: Text(
                     '약관',
                     style: TextStyle(
@@ -575,7 +603,10 @@ class _ConsentRow extends StatelessWidget {
                 GestureDetector(
                   onTap: onViewTap2,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 12,
+                    ),
                     child: Text(
                       '정책',
                       style: TextStyle(
@@ -599,12 +630,17 @@ class _DecorCircle extends StatelessWidget {
   final double size;
   final Color color;
   final double opacity;
-  const _DecorCircle({required this.size, required this.color, required this.opacity});
+  const _DecorCircle({
+    required this.size,
+    required this.color,
+    required this.opacity,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size, height: size,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: color.withValues(alpha: opacity), width: 1.5),
@@ -619,10 +655,13 @@ class _GoogleLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(width: size, height: size, child: CustomPaint(painter: _GoogleLogoPainter()));
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _GoogleLogoPainter()),
+    );
   }
 }
-
 
 class _GoogleLogoPainter extends CustomPainter {
   @override
@@ -632,15 +671,25 @@ class _GoogleLogoPainter extends CustomPainter {
     final r = size.width / 2;
     final sw = size.width * 0.18;
 
-    Paint p(Color c) => Paint()..color = c..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.round;
+    Paint p(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.round;
 
     final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.75);
     canvas.drawArc(rect, 0.55, 1.15, false, p(const Color(0xFFEA4335)));
     canvas.drawArc(rect, 1.7, 1.1, false, p(const Color(0xFF34A853)));
     canvas.drawArc(rect, 2.8, 1.1, false, p(const Color(0xFF4285F4)));
     canvas.drawArc(rect, 3.9, 0.95, false, p(const Color(0xFFFBBC05)));
-    canvas.drawLine(Offset(cx, cy), Offset(cx + r * 0.7, cy),
-        Paint()..color = const Color(0xFF4285F4)..strokeWidth = sw..strokeCap = StrokeCap.round);
+    canvas.drawLine(
+      Offset(cx, cy),
+      Offset(cx + r * 0.7, cy),
+      Paint()
+        ..color = const Color(0xFF4285F4)
+        ..strokeWidth = sw
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   @override
